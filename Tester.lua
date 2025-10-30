@@ -179,7 +179,7 @@ if not isfolder(jsonFolder) then
 end
 
 -- JSON Auto Walk Files
-local baseURL = "https://raw.githubusercontent.com/0x0x0x0xblaze/RullzsyHUB/refs/heads/main/json/json_mount_cielo/"
+local baseURL = "https://raw.githubusercontent.com/0x0x0x0xblaze/RullzsyHUB/refs/heads/main/json/json_mount_age/"
 local jsonFiles = {
     "spawnpoint.json",
     "checkpoint_1.json",
@@ -189,7 +189,6 @@ local jsonFiles = {
     "checkpoint_5.json",
     "checkpoint_6.json",
     "checkpoint_7.json",
-    "checkpoint_8.json",
 }
 
 -- Variables Auto Walk
