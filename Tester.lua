@@ -1,12 +1,14 @@
 -- ============================================================
--- AstrionHUB Gen3 - FIXED SPEED + GROUND LOCK SYSTEM
--- By Jinho - Speed Working + Feet Touch Ground
+-- AstrionHUB Gen2 - 120FPS Ultra Smooth NO JITTER (JUMP FIXED)
+-- By Jinho - Jump Fix + Avatar Detection
 -- ============================================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
-local hrp = nil
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local hrp = character:WaitForChild("HumanoidRootPart")
 
 local Packs = {
     lucide = loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/Footagesus/Icons/refs/heads/main/lucide/dist/Icons.lua"))(),
@@ -15,19 +17,17 @@ local Packs = {
 }
 
 local function refreshHRP(char)
-    if not char then
-        char = player.Character or player.CharacterAdded:Wait()
-    end
-    hrp = char:WaitForChild("HumanoidRootPart")
+    character = char
+    humanoid = character:WaitForChild("Humanoid")
+    hrp = character:WaitForChild("HumanoidRootPart")
 end
-if player.Character then refreshHRP(player.Character) end
 player.CharacterAdded:Connect(refreshHRP)
 
 -- ============================================================
--- VARIABLES (Gen3 - FIXED!)
+-- VARIABLES
 -- ============================================================
-local BASE_FRAME_TIME = 1/120  -- Base 120FPS
-local playbackRate = 1.0  -- Speed multiplier (FIXED!)
+local frameTime = 1/120
+local playbackRate = 1.0
 local isRunning = false
 local routes = {}
 local smoothTransition = true
@@ -37,73 +37,11 @@ local walkToStart = true
 local intervalFlip = false
 
 -- ============================================================
--- GROUND LOCK SYSTEM (Gen3 NEW!)
--- ============================================================
-local groundLockEnabled = true
-local groundCheckDistance = 10
-local groundLerpSpeed = 0.4
-local lastGroundY = nil
-local minGroundHeight = -500
-
-local function findGroundBelow(position)
-    local rayParams = RaycastParams.new()
-    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-    rayParams.FilterDescendantsInstances = {player.Character}
-    
-    local origin = position + Vector3.new(0, 2, 0)
-    local direction = Vector3.new(0, -groundCheckDistance - 2, 0)
-    
-    local rayResult = workspace:Raycast(origin, direction, rayParams)
-    
-    if rayResult then
-        return rayResult.Position.Y
-    end
-    return nil
-end
-
-local function applyGroundLock(targetCF)
-    if not groundLockEnabled or not hrp then
-        return targetCF
-    end
-    
-    local targetPos = targetCF.Position
-    local groundY = findGroundBelow(targetPos)
-    
-    if groundY and groundY > minGroundHeight then
-        lastGroundY = groundY
-        
-        local char = player.Character
-        if char then
-            local humanoid = char:FindFirstChild("Humanoid")
-            if humanoid then
-                local hipHeight = humanoid.HipHeight
-                local adjustedY = groundY + hipHeight + 0.5
-                
-                if lastGroundY then
-                    adjustedY = lastGroundY + (adjustedY - lastGroundY) * groundLerpSpeed
-                end
-                
-                local newPos = Vector3.new(targetPos.X, adjustedY, targetPos.Z)
-                return CFrame.new(newPos) * (targetCF - targetCF.Position)
-            end
-        end
-    elseif lastGroundY then
-        local adjustedY = lastGroundY
-        local newPos = Vector3.new(targetPos.X, adjustedY, targetPos.Z)
-        return CFrame.new(newPos) * (targetCF - targetCF.Position)
-    end
-    
-    return targetCF
-end
-
--- ============================================================
 -- ANTI-JITTER SYSTEM
 -- ============================================================
 local antiJitterEnabled = true
 local smoothingBuffer = {}
 local bufferSize = 3
-local lastVelocity = Vector3.zero
-local velocityDamping = 0.95
 
 local function smoothPosition(newCF)
     if not antiJitterEnabled then return newCF end
@@ -120,15 +58,6 @@ local function smoothPosition(newCF)
     avgPos = avgPos / #smoothingBuffer
     
     return CFrame.new(avgPos) * (newCF - newCF.Position)
-end
-
-local function stabilizeVelocity()
-    if hrp and hrp.Parent then
-        local currentVel = hrp.AssemblyLinearVelocity
-        local targetVel = lastVelocity * velocityDamping
-        hrp.AssemblyLinearVelocity = currentVel:Lerp(targetVel, 0.5)
-        lastVelocity = hrp.AssemblyLinearVelocity
-    end
 end
 
 -- ============================================================
@@ -182,28 +111,8 @@ local function parseCFrameData(data)
 end
 
 -- ============================================================
--- ROUTE SYSTEM
+-- ROUTE SYSTEM (NO AVATAR DETECTOR!)
 -- ============================================================
-local DEFAULT_HEIGHT = 4.947289
-
-local function getCurrentHeight()
-    local char = player.Character or player.CharacterAdded:Wait()
-    local humanoid = char:WaitForChild("Humanoid")
-    return humanoid.HipHeight + (char:FindFirstChild("Head") and char.Head.Size.Y or 2)
-end
-
-local function adjustRoute(frames)
-    local adjusted = {}
-    local currentHeight = getCurrentHeight()
-    local offsetY = currentHeight - DEFAULT_HEIGHT
-    for _, cf in ipairs(frames) do
-        local pos, rot = cf.Position, cf - cf.Position
-        local newPos = Vector3.new(pos.X, pos.Y + offsetY, pos.Z)
-        table.insert(adjusted, CFrame.new(newPos) * rot)
-    end
-    return adjusted
-end
-
 local function removeDuplicateFrames(frames, tolerance)
     tolerance = tolerance or 0.01
     if #frames < 2 then return frames end
@@ -213,10 +122,8 @@ local function removeDuplicateFrames(frames, tolerance)
         local curr = frames[i]
         local prevPos, currPos = prev.Position, curr.Position
         local prevRot, currRot = prev - prev.Position, curr - curr.Position
-
         local posDiff = (prevPos - currPos).Magnitude
         local rotDiff = (prevRot.Position - currRot.Position).Magnitude
-
         if posDiff > tolerance or rotDiff > tolerance then
             table.insert(newFrames, curr)
         end
@@ -242,7 +149,7 @@ local function loadRoute(url)
     if ok and type(result) == "table" then
         local parsedFrames = parseCFrameData(result)
         local cleaned = removeDuplicateFrames(parsedFrames, 0.01)
-        return adjustRoute(cleaned)
+        return cleaned
     else
         warn("Failed to load route from: "..url)
         return {}
@@ -303,7 +210,7 @@ end
 -- ULTRA SMOOTH WALK
 -- ============================================================
 local function walkToPosition(targetCF, walkSpeed)
-    if not hrp then refreshHRP() end
+    if not hrp then return end
     
     walkSpeed = walkSpeed or 16
     local startPos = hrp.Position
@@ -317,29 +224,22 @@ local function walkToPosition(targetCF, walkSpeed)
             local alpha = i / steps
             local smoothAlpha = ultraSmoothEasing(alpha, 0.02)
             local newCF = hrp.CFrame:Lerp(targetCF, smoothAlpha * 0.3)
-            newCF = applyGroundLock(newCF)
             hrp.CFrame = smoothPosition(newCF)
-            stabilizeVelocity()
-            task.wait(BASE_FRAME_TIME)
+            task.wait(1/120)
         end
         return
     end
     
     while (hrp.Position - targetPos).Magnitude > 3 do
         if not isRunning then break end
-        
         local currentPos = hrp.Position
         local direction = (targetPos - currentPos).Unit
-        local step = math.min(walkSpeed * BASE_FRAME_TIME, (targetPos - currentPos).Magnitude)
-        
+        local step = math.min(walkSpeed * (1/120), (targetPos - currentPos).Magnitude)
         local lookCF = CFrame.lookAt(currentPos, targetPos)
         local newPos = currentPos + direction * step
         local newCF = CFrame.new(newPos) * (lookCF - lookCF.Position)
-        
-        newCF = applyGroundLock(newCF)
         hrp.CFrame = hrp.CFrame:Lerp(newCF, 0.5)
-        stabilizeVelocity()
-        task.wait(BASE_FRAME_TIME)
+        task.wait(1/120)
     end
     
     local arrivalSteps = 30
@@ -348,29 +248,24 @@ local function walkToPosition(targetCF, walkSpeed)
         local alpha = i / arrivalSteps
         local smoothAlpha = ultraSmoothEasing(alpha, 0.01)
         local newCF = hrp.CFrame:Lerp(targetCF, smoothAlpha * 0.25)
-        newCF = applyGroundLock(newCF)
         hrp.CFrame = smoothPosition(newCF)
-        stabilizeVelocity()
-        task.wait(BASE_FRAME_TIME)
+        task.wait(1/120)
     end
 end
 
 -- ============================================================
--- ULTRA SMOOTH LERP (SPEED FIXED!)
+-- ULTRA SMOOTH LERP (SIMPLE - NO DETECTION!)
 -- ============================================================
 local function lerpCF(fromCF, toCF)
     fromCF = applyIntervalRotation(fromCF)
     toCF = applyIntervalRotation(toCF)
 
-    -- FIXED: Speed sekarang benar-benar berfungsi!
-    -- Semakin tinggi playbackRate, semakin cepat (duration lebih pendek)
-    local duration = BASE_FRAME_TIME / math.max(0.1, playbackRate)
+    local duration = frameTime / math.max(0.05, playbackRate)
     local t = 0
     
     if smoothTransition then
         local lastCF = fromCF
         local lastTime = tick()
-        
         smoothingBuffer = {}
         
         while t < duration do
@@ -378,23 +273,19 @@ local function lerpCF(fromCF, toCF)
             local currentTime = tick()
             local dt = currentTime - lastTime
             lastTime = currentTime
-            t = t + dt
+            t += dt
             
-            local alpha = math.min(t / duration, 1)
+            local alpha = t / duration
             local smoothAlpha = ultraSmoothEasing(alpha, transitionSmoothness)
+            smoothAlpha = math.min(smoothAlpha, 1)
             
             if hrp and hrp.Parent and hrp:IsDescendantOf(workspace) then
                 local targetCF = fromCF:Lerp(toCF, smoothAlpha)
                 local preLerp = lastCF:Lerp(targetCF, 0.85)
                 local smoothedCF = smoothPosition(preLerp)
                 
-                -- Apply ground lock
-                smoothedCF = applyGroundLock(smoothedCF)
-                
                 hrp.CFrame = smoothedCF
                 lastCF = hrp.CFrame
-                
-                stabilizeVelocity()
             end
             
             RunService.Heartbeat:Wait()
@@ -402,21 +293,16 @@ local function lerpCF(fromCF, toCF)
         
         if hrp and hrp.Parent and hrp:IsDescendantOf(workspace) then
             local finalCF = smoothPosition(hrp.CFrame:Lerp(toCF, 0.9))
-            finalCF = applyGroundLock(finalCF)
             hrp.CFrame = finalCF
-            stabilizeVelocity()
         end
     else
         while t < duration do
             if not isRunning then break end
             local dt = RunService.Heartbeat:Wait()
-            t = t + dt
+            t += dt
             local alpha = math.min(t / duration, 1)
             if hrp and hrp.Parent and hrp:IsDescendantOf(workspace) then
-                local newCF = fromCF:Lerp(toCF, alpha)
-                newCF = applyGroundLock(newCF)
-                hrp.CFrame = newCF
-                stabilizeVelocity()
+                hrp.CFrame = fromCF:Lerp(toCF, alpha)
             end
         end
     end
@@ -425,61 +311,34 @@ end
 local notify = function() end
 
 -- ============================================================
--- BYPASS SYSTEM (Preserve Animations!)
+-- BYPASS SYSTEM
 -- ============================================================
 local bypassActive = false
 local bypassConn
-local lastJumpState = false
-local doubleJumpEnabled = true
 
 local function setupBypass(char)
-    local humanoid = char:WaitForChild("Humanoid")
-    local hrp = char:WaitForChild("HumanoidRootPart")
-    local lastPos = hrp.Position
-    local isDoubleJumping = false
-    local doubleJumpForce = 50
+    local hum = char:WaitForChild("Humanoid")
+    local root = char:WaitForChild("HumanoidRootPart")
+    local lastPos = root.Position
 
     if bypassConn then bypassConn:Disconnect() end
     bypassConn = RunService.RenderStepped:Connect(function()
-        if not hrp or not hrp.Parent then return end
+        if not root or not root.Parent then return end
         
         if bypassActive then
-            local direction = (hrp.Position - lastPos)
+            local currentPos = root.Position
+            local direction = (currentPos - lastPos)
             local dist = direction.Magnitude
-
-            local yDiff = hrp.Position.Y - lastPos.Y
-            local currentState = humanoid:GetState()
             
-            -- Preserve jump animation
-            if yDiff > 0.5 and not isDoubleJumping then
-                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                isDoubleJumping = true
-                
-                if doubleJumpEnabled and currentState == Enum.HumanoidStateType.Freefall then
-                    local currentVelocity = hrp.AssemblyLinearVelocity
-                    hrp.AssemblyLinearVelocity = Vector3.new(
-                        currentVelocity.X,
-                        doubleJumpForce,
-                        currentVelocity.Z
-                    )
-                end
-            elseif yDiff < -1 then
-                humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
-                isDoubleJumping = false
-            elseif math.abs(yDiff) < 0.1 then
-                isDoubleJumping = false
-            end
-
-            -- Preserve walking/running animation
             if dist > 0.01 then
                 local moveVector = direction.Unit * math.clamp(dist * 5, 0, 1)
-                humanoid:Move(moveVector, false)
+                hum:Move(moveVector, false)
             else
-                humanoid:Move(Vector3.zero, false)
+                hum:Move(Vector3.zero, false)
             end
         end
         
-        lastPos = hrp.Position
+        lastPos = root.Position
     end)
 end
 
@@ -500,7 +359,7 @@ end
 -- ============================================================
 local function runRouteOnce()
     if #routes == 0 then return end
-    if not hrp then refreshHRP() end
+    if not hrp then return end
 
     setBypass(true)
     isRunning = true
@@ -524,9 +383,7 @@ local function runRouteOnce()
         for i = 1, steps do
             if not isRunning then break end
             local alpha = i / steps
-            local newCF = hrp.CFrame:Lerp(startCF, alpha * 0.5)
-            newCF = applyGroundLock(newCF)
-            hrp.CFrame = newCF
+            hrp.CFrame = hrp.CFrame:Lerp(startCF, alpha * 0.5)
             task.wait(0.03)
         end
     end
@@ -544,15 +401,12 @@ end
 local function runAllRoutes()
     if #routes == 0 then return end
     isRunning = true
-    
     local loopCount = 0
 
     while isRunning do
         loopCount = loopCount + 1
-        
-        if not hrp then refreshHRP() end
+        if not hrp then break end
         setBypass(true)
-
         local idx = getNearestRoute()
         
         if loopCount == 1 then
@@ -561,7 +415,6 @@ local function runAllRoutes()
                 local startIdx = getNearestFrameIndex(frames)
                 local startCF = frames[startIdx]
                 local distance = (hrp.Position - startCF.Position).Magnitude
-                
                 if walkToStart and distance > 50 then
                     walkToPosition(startCF, 20)
                 end
@@ -572,13 +425,10 @@ local function runAllRoutes()
             if not isRunning then break end
             local frames = routes[r][2]
             if #frames < 2 then continue end
-            
             local startIdx = 1
-            
             if r == idx and loopCount == 1 then
                 startIdx = getNearestFrameIndex(frames)
             end
-            
             for i = startIdx, #frames - 1 do
                 if not isRunning then break end
                 lerpCF(frames[i], frames[i+1])
@@ -586,9 +436,7 @@ local function runAllRoutes()
         end
 
         setBypass(false)
-
         if not isRunning then break end
-        
         if autoLoop then
             task.wait(1)
         else
@@ -600,34 +448,54 @@ end
 
 local function stopRoute()
     isRunning = false
-
     if bypassActive then
         bypassActive = false
         notify("Bypass Animation", "Inactive", 2)
     end
-    
     if hrp then
         _G.LastStopPosition = hrp.CFrame
     end
 end
 
 -- ============================================================
--- ANTI BETON
+-- ANTI BETON (JUMP FIXED!)
 -- ============================================================
 local antiBetonActive = false
 local antiBetonConn
+local jumpStateConn
+local isJumping = false
+local jumpDebounce = false
 
 local function enableAntiBeton()
     if antiBetonConn then antiBetonConn:Disconnect() end
-
+    if jumpStateConn then jumpStateConn:Disconnect() end
+    
+    -- Monitor jump state
+    jumpStateConn = humanoid.StateChanged:Connect(function(oldState, newState)
+        if newState == Enum.HumanoidStateType.Jumping then
+            isJumping = true
+            jumpDebounce = true
+            task.delay(0.5, function()
+                jumpDebounce = false
+            end)
+        elseif newState == Enum.HumanoidStateType.Freefall then
+            if not jumpDebounce then
+                isJumping = false
+            end
+        elseif newState == Enum.HumanoidStateType.Landed then
+            isJumping = false
+            jumpDebounce = false
+        end
+    end)
+    
     antiBetonConn = RunService.Stepped:Connect(function(_, dt)
         local char = player.Character
         if not char then return end
         local hrp = char:FindFirstChild("HumanoidRootPart")
         local humanoid = char:FindFirstChild("Humanoid")
         if not hrp or not humanoid then return end
-
-        if antiBetonActive and humanoid.FloorMaterial == Enum.Material.Air then
+        
+        if antiBetonActive and humanoid.FloorMaterial == Enum.Material.Air and not isJumping and not jumpDebounce then
             local targetY = -50
             local currentY = hrp.Velocity.Y
             local newY = currentY + (targetY - currentY) * math.clamp(dt * 2.5, 0, 1)
@@ -641,6 +509,12 @@ local function disableAntiBeton()
         antiBetonConn:Disconnect()
         antiBetonConn = nil
     end
+    if jumpStateConn then
+        jumpStateConn:Disconnect()
+        jumpStateConn = nil
+    end
+    isJumping = false
+    jumpDebounce = false
 end
 
 -- ============================================================
@@ -661,11 +535,9 @@ local function loadAvatarByUsername(username)
     if not username or username == "" then
         return false, "Username cannot be empty"
     end
-
     if not player.Character then
         return false, "Character not found"
     end
-
     local targetPlayer = nil
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr.Name == username then
@@ -673,7 +545,6 @@ local function loadAvatarByUsername(username)
             break
         end
     end
-
     local userId = nil
     if targetPlayer then
         userId = targetPlayer.UserId
@@ -686,51 +557,37 @@ local function loadAvatarByUsername(username)
         end
         userId = result
     end
-
     local success2, humanoidDesc = pcall(function()
         return Players:GetHumanoidDescriptionFromUserId(userId)
     end)
     if not success2 then
         return false, "Failed to get avatar"
     end
-
     local character = player.Character
     local humanoid = character:FindFirstChild("Humanoid")
-    
     if not humanoid then
         return false, "Humanoid not found"
     end
-
     for _, item in pairs(character:GetChildren()) do
-        if item:IsA("Accessory") or 
-           item:IsA("Hat") or 
-           item:IsA("Shirt") or 
-           item:IsA("Pants") or 
-           item:IsA("ShirtGraphic") or
-           item:IsA("CharacterMesh") or
-           item:IsA("BodyColors") then
+        if item:IsA("Accessory") or item:IsA("Hat") or item:IsA("Shirt") or 
+           item:IsA("Pants") or item:IsA("ShirtGraphic") or
+           item:IsA("CharacterMesh") or item:IsA("BodyColors") then
             item:Destroy()
         end
     end
-    
     task.wait(0.15)
-
     local success3 = pcall(function()
         humanoid:ApplyDescriptionClientServer(humanoidDesc)
     end)
-    
     if not success3 then
         pcall(function()
             humanoid:ApplyDescription(humanoidDesc)
         end)
     end
-    
     task.wait(0.5)
-    
     pcall(function()
         humanoid:BuildRigFromAttachments()
     end)
-
     return true, "Avatar copied: " .. username
 end
 
@@ -739,37 +596,25 @@ end
 -- ============================================================
 local RunAnimations = {
     ["Run Animation 1"] = {
-        Idle1   = "rbxassetid://122257458498464",
-        Idle2   = "rbxassetid://102357151005774",
-        Walk    = "http://www.roblox.com/asset/?id=18537392113",
-        Run     = "rbxassetid://82598234841035",
-        Jump    = "rbxassetid://75290611992385",
-        Fall    = "http://www.roblox.com/asset/?id=11600206437",
-        Climb   = "http://www.roblox.com/asset/?id=10921257536",
-        Swim    = "http://www.roblox.com/asset/?id=10921264784",
-        SwimIdle= "http://www.roblox.com/asset/?id=10921265698"
+        Idle1 = "rbxassetid://122257458498464", Idle2 = "rbxassetid://102357151005774",
+        Walk = "http://www.roblox.com/asset/?id=18537392113", Run = "rbxassetid://82598234841035",
+        Jump = "rbxassetid://75290611992385", Fall = "http://www.roblox.com/asset/?id=11600206437",
+        Climb = "http://www.roblox.com/asset/?id=10921257536", Swim = "http://www.roblox.com/asset/?id=10921264784",
+        SwimIdle = "http://www.roblox.com/asset/?id=10921265698"
     },
     ["Run Animation 2"] = {
-        Idle1   = "rbxassetid://122257458498464",
-        Idle2   = "rbxassetid://102357151005774",
-        Walk    = "rbxassetid://122150855457006",
-        Run     = "rbxassetid://82598234841035",
-        Jump    = "rbxassetid://75290611992385",
-        Fall    = "rbxassetid://98600215928904",
-        Climb   = "rbxassetid://88763136693023",
-        Swim    = "rbxassetid://133308483266208",
-        SwimIdle= "rbxassetid://109346520324160"
+        Idle1 = "rbxassetid://122257458498464", Idle2 = "rbxassetid://102357151005774",
+        Walk = "rbxassetid://122150855457006", Run = "rbxassetid://82598234841035",
+        Jump = "rbxassetid://75290611992385", Fall = "rbxassetid://98600215928904",
+        Climb = "rbxassetid://88763136693023", Swim = "rbxassetid://133308483266208",
+        SwimIdle = "rbxassetid://109346520324160"
     },
     ["Run Animation 3"] = {
-        Idle1   = "http://www.roblox.com/asset/?id=18537376492",
-        Idle2   = "http://www.roblox.com/asset/?id=18537371272",
-        Walk    = "http://www.roblox.com/asset/?id=18537392113",
-        Run     = "http://www.roblox.com/asset/?id=18537384940",
-        Jump    = "http://www.roblox.com/asset/?id=18537380791",
-        Fall    = "http://www.roblox.com/asset/?id=18537367238",
-        Climb   = "http://www.roblox.com/asset/?id=10921271391",
-        Swim    = "http://www.roblox.com/asset/?id=99384245425157",
-        SwimIdle= "http://www.roblox.com/asset/?id=113199415118199"
+        Idle1 = "http://www.roblox.com/asset/?id=18537376492", Idle2 = "http://www.roblox.com/asset/?id=18537371272",
+        Walk = "http://www.roblox.com/asset/?id=18537392113", Run = "http://www.roblox.com/asset/?id=18537384940",
+        Jump = "http://www.roblox.com/asset/?id=18537380791", Fall = "http://www.roblox.com/asset/?id=18537367238",
+        Climb = "http://www.roblox.com/asset/?id=10921271391", Swim = "http://www.roblox.com/asset/?id=99384245425157",
+        SwimIdle = "http://www.roblox.com/asset/?id=113199415118199"
     },
 }
 
@@ -788,12 +633,12 @@ end
 local function ApplyAnimations(Animate, Humanoid, AnimPack)
     Animate.idle.Animation1.AnimationId = AnimPack.Idle1
     Animate.idle.Animation2.AnimationId = AnimPack.Idle2
-    Animate.walk.WalkAnim.AnimationId   = AnimPack.Walk
-    Animate.run.RunAnim.AnimationId     = AnimPack.Run
-    Animate.jump.JumpAnim.AnimationId   = AnimPack.Jump
-    Animate.fall.FallAnim.AnimationId   = AnimPack.Fall
+    Animate.walk.WalkAnim.AnimationId = AnimPack.Walk
+    Animate.run.RunAnim.AnimationId = AnimPack.Run
+    Animate.jump.JumpAnim.AnimationId = AnimPack.Jump
+    Animate.fall.FallAnim.AnimationId = AnimPack.Fall
     Animate.climb.ClimbAnim.AnimationId = AnimPack.Climb
-    Animate.swim.Swim.AnimationId       = AnimPack.Swim
+    Animate.swim.Swim.AnimationId = AnimPack.Swim
     Animate.swimidle.SwimIdle.AnimationId = AnimPack.SwimIdle
     Humanoid.Jump = true
 end
@@ -818,6 +663,7 @@ end
 Players.LocalPlayer.CharacterAdded:Connect(function(Char)
     task.wait(1)
     SetupCharacter(Char)
+    refreshHRP(Char)
 end)
 
 if Players.LocalPlayer.Character then
@@ -830,7 +676,7 @@ end
 local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 
 local Window = WindUI:CreateWindow({
-    Title = "AstrionHUB Gen3",
+    Title = "AstrionHUB Gen2",
     Icon = "lucide:mountain-snow",
     Author = "Jinho",
     Folder = "AstrionHub",
@@ -838,18 +684,7 @@ local Window = WindUI:CreateWindow({
     Theme = "Midnight",
     Resizable = true,
     SideBarWidth = 200,
-    Watermark = "Jinho",
-    User = {
-        Enabled = true,
-        Anonymous = false,
-        Callback = function()
-            WindUI:Notify({
-                Title = "User Profile",
-                Content = "Profile opened",
-                Duration = 2
-            })
-        end
-    }
+    Watermark = "Jinho"
 })
 
 notify = function(title, content, duration)
@@ -875,42 +710,17 @@ end
 
 enableAntiIdle()
 
-local MainTab = Window:Tab({
-    Title = "Main",
-    Icon = "geist:shareplay",
-    Default = true
-})
-local ToolsTab = Window:Tab({
-    Title = "Tools",
-    Icon = "geist:settings-sliders",
-})
-local AvaTab = Window:Tab({
-    Title = "Avatar Copy",
-    Icon = "lucide:user-round-search",
-})
-local AnimTab = Window:Tab({
-    Title = "Animation",
-    Icon = "lucide:sparkles",
-})
-local tampTab = Window:Tab({
-    Title = "Display",
-    Icon = "lucide:app-window",
-})
-local InfoTab = Window:Tab({
-    Title = "Info",
-    Icon = "lucide:info",
-})
+local MainTab = Window:Tab({Title = "Main", Icon = "geist:shareplay", Default = true})
+local ToolsTab = Window:Tab({Title = "Tools", Icon = "geist:settings-sliders"})
+local AvaTab = Window:Tab({Title = "Avatar Copy", Icon = "lucide:user-round-search"})
+local AnimTab = Window:Tab({Title = "Animation", Icon = "lucide:sparkles"})
+local tampTab = Window:Tab({Title = "Display", Icon = "lucide:app-window"})
+local InfoTab = Window:Tab({Title = "Info", Icon = "lucide:info"})
 
--- ============================================================
--- MAIN TAB (Gen3 - SPEED FIXED!)
--- ============================================================
-MainTab:Section({
-    Title = "🚀 Gen3 - Speed Fixed + Ground Lock",
-    TextSize = 16,
-})
+-- MAIN TAB
+MainTab:Section({Title = "🚀 CONTROLS", TextSize = 16})
 
-local speeds = {}
-table.insert(speeds, "1.0x")
+local speeds = {"1.0x"}
 for v = 1.1, 10.0, 0.1 do
     table.insert(speeds, string.format("%.1fx", v))
 end
@@ -924,298 +734,31 @@ MainTab:Dropdown({
         local num = tonumber(option:match("([%d%.]+)"))
         if num then
             playbackRate = num
-            notify("Speed", string.format("⚡ %.1fx Speed Active!", playbackRate), 2)
+            notify("Speed", string.format("⚡ %.1fx", playbackRate), 2)
         end
     end
 })
 
-MainTab:Button({
-    Title = "▶️ START",
-    Icon = "lucide:play",
-    Desc = "Start route with current speed",
-    Callback = function() 
-        pcall(runRouteOnce)
-        notify("Route", "🚀 Started with " .. playbackRate .. "x speed", 2)
-    end
-})
+MainTab:Button({Title = "▶️ START", Icon = "lucide:play", Callback = function() pcall(runRouteOnce) notify("Route", "Started", 2) end})
+MainTab:Button({Title = "⏹️ STOP", Icon = "lucide:square", Callback = function() pcall(stopRoute) end})
+MainTab:Button({Title = "🔄 LOOP ALL", Icon = "lucide:repeat", Callback = function() pcall(runAllRoutes) end})
 
-MainTab:Button({
-    Title = "⏹️ STOP",
-    Icon = "lucide:square",
-    Desc = "Stop current route",
-    Callback = function() pcall(stopRoute) end
-})
+MainTab:Section({Title = "🎛️ SETTINGS", TextSize = 14})
 
-MainTab:Button({
-    Title = "🔄 LOOP ALL",
-    Desc = "Loop all routes continuously",
-    Icon = "lucide:repeat",
-    Callback = function() pcall(runAllRoutes) end
-})
+MainTab:Toggle({Title = "Ultra Smooth", Value = true, Callback = function(s) smoothTransition = s end})
+MainTab:Slider({Title = "Smoothness", Value = {Min=0.01, Max=1.0, Default=0.05}, Step=0.01, Callback = function(v) transitionSmoothness = v end})
+MainTab:Toggle({Title = "Anti-Jitter", Value = true, Callback = function(s) antiJitterEnabled = s end})
+MainTab:Toggle({Title = "Anti Beton", Value = false, Callback = function(s) antiBetonActive = s if s then enableAntiBeton() else disableAntiBeton() end end})
 
-MainTab:Toggle({
-    Title = "Ground Lock",
-    Icon = "lucide:anchor",
-    Desc = "Keep feet touching ground (NEW Gen3!)",
-    Value = true,
-    Callback = function(state)
-        groundLockEnabled = state
-        notify("Ground Lock", state and "✅ Feet Touch Ground" or "❌ Disabled", 2)
-    end
-})
-
-MainTab:Slider({
-    Title = "Ground Smoothness",
-    Icon = "lucide:waves",
-    Desc = "Ground lock smoothness (0.1-1.0)",
-    Value = { 
-        Min = 0.1,
-        Max = 1.0,
-        Default = 0.4
-    },
-    Step = 0.05,
-    Suffix = "",
-    Callback = function(val)
-        groundLerpSpeed = val
-        notify("Ground Smoothness", string.format("%.2f", val), 2)
-    end
-})
-
-MainTab:Toggle({
-    Title = "Interval Flip",
-    Icon = "lucide:refresh-ccw",
-    Desc = "Rotate 180° each frame",
-    Value = false,
-    Callback = function(state)
-        intervalFlip = state
-    end
-})
-
-MainTab:Toggle({
-    Title = "120FPS Ultra Smooth",
-    Icon = "lucide:sparkles",
-    Desc = "Septic + Smoothstep blend",
-    Value = true,
-    Callback = function(state)
-        smoothTransition = state
-        notify("Ultra Smooth", state and "✅ Active" or "❌ Inactive", 2)
-    end
-})
-
-MainTab:Slider({
-    Title = "Smoothness",
-    Icon = "lucide:waves",
-    Desc = "Movement smoothness (0.01-1.0)",
-    Value = { 
-        Min = 0.01,
-        Max = 1.0,
-        Default = 0.05
-    },
-    Step = 0.01,
-    Suffix = "",
-    Callback = function(val)
-        transitionSmoothness = val
-        local quality = val <= 0.02 and "🌟 ULTRA" or val <= 0.05 and "⭐ HIGH" or "✨ NORMAL"
-        notify("Smoothness", string.format("%s %.2f", quality, val), 2)
-    end
-})
-
-MainTab:Toggle({
-    Title = "Anti-Jitter System",
-    Icon = "lucide:shield-check",
-    Desc = "Eliminate body shake",
-    Value = true,
-    Callback = function(state)
-        antiJitterEnabled = state
-        notify("Anti-Jitter", state and "✅ Active" or "❌ Inactive", 2)
-    end
-})
-
-MainTab:Toggle({
-    Title = "Anti Beton",
-    Icon = "lucide:shield",
-    Desc = "Prevent fall stiffness",
-    Value = false,
-    Callback = function(state)
-        antiBetonActive = state
-        if state then
-            enableAntiBeton()
-        else
-            disableAntiBeton()
-        end
-    end
-})
-
--- ============================================================
 -- TOOLS TAB
--- ============================================================
-ToolsTab:Toggle({
-    Title = "Auto Loop Mode",
-    Icon = "lucide:repeat",
-    Desc = "Loop without respawn",
-    Value = true,
-    Callback = function(state)
-        autoLoop = state
-    end
-})
+ToolsTab:Toggle({Title = "Auto Loop", Value = true, Callback = function(s) autoLoop = s end})
+ToolsTab:Toggle({Title = "Walk to Start", Value = true, Callback = function(s) walkToStart = s end})
+ToolsTab:Slider({Title = "WalkSpeed", Value = {Min=10, Max=500, Default=16}, Step=1, Callback = function(v) if character and character:FindFirstChild("Humanoid") then character.Humanoid.WalkSpeed = v end end})
+ToolsTab:Slider({Title = "Jump Height", Value = {Min=10, Max=500, Default=50}, Step=1, Callback = function(v) if character and character:FindFirstChild("Humanoid") then character.Humanoid.JumpPower = v end end})
+ToolsTab:Button({Title = "Respawn", Icon = "lucide:user-minus", Callback = function() respawnPlayer() end})
 
-ToolsTab:Toggle({
-    Title = "Walk to Start",
-    Icon = "lucide:footprints",
-    Desc = "Walk if distance >50 studs",
-    Value = true,
-    Callback = function(state)
-        walkToStart = state
-    end
-})
-
-ToolsTab:Button({
-    Title = "Timer GUI",
-    Icon = "lucide:timer",
-    Desc = "Load timer GUI",
-    Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/Jinho/YAHAYUK/refs/heads/main/TIMER"))()
-    end
-})
-
-ToolsTab:Button({
-    Title = "Private Server",
-    Icon = "lucide:server",
-    Desc = "Teleport to private server",
-    Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/Jinho/PS/refs/heads/main/ps"))()
-    end
-})
-
-ToolsTab:Slider({
-    Title = "WalkSpeed",
-    Icon = "lucide:zap",
-    Desc = "Character walk speed",
-    Value = { 
-        Min = 10,
-        Max = 500,
-        Default = 16
-    },
-    Step = 1,
-    Suffix = "",
-    Callback = function(val)
-        local char = player.Character
-        if char and char:FindFirstChild("Humanoid") then
-            char.Humanoid.WalkSpeed = val
-        end
-    end
-})
-
-ToolsTab:Slider({
-    Title = "Jump Height",
-    Icon = "lucide:arrow-up",
-    Desc = "Character jump power",
-    Value = { 
-        Min = 10,
-        Max = 500,
-        Default = 50
-    },
-    Step = 1,
-    Suffix = "",
-    Callback = function(val)
-        local char = player.Character
-        if char and char:FindFirstChild("Humanoid") then
-            char.Humanoid.JumpPower = val
-        end
-    end
-})
-
-ToolsTab:Button({
-    Title = "Respawn",
-    Icon = "lucide:user-minus",
-    Desc = "Respawn character",
-    Callback = function()
-        respawnPlayer()
-    end
-})
-
-ToolsTab:Button({
-    Title = "Speed Coil",
-    Icon = "lucide:zap",
-    Desc = "Add speed coil tool",
-    Callback = function()
-        local speedValue = 23
-
-        local function giveCoil(char)
-            local backpack = player:WaitForChild("Backpack")
-            if backpack:FindFirstChild("Speed Coil") or char:FindFirstChild("Speed Coil") then return end
-
-            local tool = Instance.new("Tool")
-            tool.Name = "Speed Coil"
-            tool.RequiresHandle = false
-            tool.Parent = backpack
-
-            tool.Equipped:Connect(function()
-                local humanoid = char:FindFirstChildOfClass("Humanoid")
-                if humanoid then humanoid.WalkSpeed = speedValue end
-            end)
-
-            tool.Unequipped:Connect(function()
-                local humanoid = char:FindFirstChildOfClass("Humanoid")
-                if humanoid then humanoid.WalkSpeed = 16 end
-            end)
-        end
-
-        if player.Character then giveCoil(player.Character) end
-        player.CharacterAdded:Connect(function(char)
-            task.wait(1)
-            giveCoil(char)
-        end)
-    end
-})
-
-ToolsTab:Button({
-    Title = "TP Tool",
-    Icon = "lucide:chevrons-up-down",
-    Desc = "Teleport with click",
-    Callback = function()
-        local mouse = player:GetMouse()
-
-        local tool = Instance.new("Tool")
-        tool.RequiresHandle = false
-        tool.Name = "Teleport"
-        tool.Parent = player.Backpack
-
-        tool.Activated:Connect(function()
-            if mouse.Hit then
-                local char = player.Character
-                if char and char:FindFirstChild("HumanoidRootPart") then
-                    char.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0,3,0))
-                end
-            end
-        end)
-    end
-})
-
-ToolsTab:Button({
-    Title = "Fling GUI",
-    Icon = "lucide:layers-2",
-    Desc = "Load fling GUI",
-    Callback = function()
-        loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Fling-Gui-Op-47914"))()
-    end
-})
-
--- ============================================================
--- AVATAR COPY TAB
--- ============================================================
-AvaTab:Section({
-    Title = "COPY AVATAR",
-    TextSize = 20,
-})
-
-AvaTab:Paragraph({
-    Title = "How to Use",
-    Desc = "Select a player from the dropdown and click Apply to copy their avatar.",
-    Image = "lucide:info",
-    ImageSize = 20,
-    Color = "White"
-})
+-- AVATAR TAB
+AvaTab:Section({Title = "COPY AVATAR", TextSize = 16})
 
 local selectedPlayer = nil
 local playerDropdown
@@ -1233,7 +776,6 @@ playerDropdown = AvaTab:Dropdown({
     Icon = "lucide:users",
     Values = updatePlayerList(),
     SearchBarEnabled = true,
-    MenuWidth = 280,
     Value = nil,
     Callback = function(playerName)
         if playerName ~= "No players available" then
@@ -1243,12 +785,10 @@ playerDropdown = AvaTab:Dropdown({
 })
 
 AvaTab:Button({
-    Title = "🔄 Refresh List",
+    Title = "🔄 Refresh",
     Icon = "lucide:refresh-cw",
-    Desc = "Update player list",
     Callback = function()
-        local players = updatePlayerList()
-        playerDropdown:SetValues(players)
+        playerDropdown:SetValues(updatePlayerList())
         notify("Player List", "Updated", 2)
     end
 })
@@ -1256,55 +796,24 @@ AvaTab:Button({
 AvaTab:Button({
     Title = "Apply Avatar",
     Icon = "lucide:check",
-    Desc = "Copy selected player's avatar",
     Callback = function()
         if not selectedPlayer then
             notify("Error", "No player selected", 2)
             return
         end
-        
         local success, message = loadAvatarByUsername(selectedPlayer)
-        if success then
-            notify("Success", message, 2)
-        else
-            notify("Error", message, 2)
-        end
+        notify(success and "Success" or "Error", message, 2)
     end
 })
 
-AvaTab:Section({
-    Title = "Instructions",
-    TextSize = 14,
-})
-
-AvaTab:Paragraph({
-    Title = "",
-    Desc = "1. Click Refresh List to update players\n2. Select a player from dropdown\n3. Click Apply Avatar\n4. Avatar changes are visible to all players",
-    Color = "White"
-})
-
--- ============================================================
 -- ANIMATION TAB
--- ============================================================
-AnimTab:Section({
-    Title = "RUN ANIMATIONS",
-    TextSize = 20,
-})
-
-AnimTab:Paragraph({
-    Title = "Info",
-    Desc = "Select one animation pack. Only one can be active at a time.",
-    Image = "lucide:info",
-    ImageSize = 20,
-    Color = "White"
-})
+AnimTab:Section({Title = "RUN ANIMATIONS", TextSize = 16})
 
 local animationToggles = {}
 
 for animName, _ in pairs(RunAnimations) do
     animationToggles[animName] = AnimTab:Toggle({
         Title = animName,
-        Desc = "Apply " .. animName,
         Value = false,
         Callback = function(Value)
             if Value then
@@ -1313,13 +822,11 @@ for animName, _ in pairs(RunAnimations) do
                         toggle:Set(false)
                     end
                 end
-                
                 CurrentPack = RunAnimations[animName]
             elseif CurrentPack == RunAnimations[animName] then
                 CurrentPack = nil
                 RestoreOriginal()
             end
-
             local Char = Players.LocalPlayer.Character
             if Char and Char:FindFirstChild("Animate") and Char:FindFirstChild("Humanoid") then
                 if CurrentPack then
@@ -1332,46 +839,25 @@ for animName, _ in pairs(RunAnimations) do
     })
 end
 
--- ============================================================
 -- DISPLAY TAB
--- ============================================================
-tampTab:Paragraph({
-    Title = "Customize Interface",
-    Desc = "Personalize your experience",
-    Image = "palette",
-    ImageSize = 20,
-    Color = "White"
-})
-
 local themes = {}
 for themeName, _ in pairs(WindUI:GetThemes()) do
     table.insert(themes, themeName)
 end
 table.sort(themes)
 
-local canchangetheme = true
-local canchangedropdown = true
-
 local themeDropdown = tampTab:Dropdown({
-    Title = "Select Theme",
+    Title = "Theme",
     Values = themes,
-    SearchBarEnabled = true,
-    MenuWidth = 280,
     Value = "Dark",
     Callback = function(theme)
-        canchangedropdown = false
         WindUI:SetTheme(theme)
-        canchangedropdown = true
     end
 })
 
-local transparencySlider = tampTab:Slider({
+tampTab:Slider({
     Title = "Transparency",
-    Value = { 
-        Min = 0,
-        Max = 1,
-        Default = 0.2,
-    },
+    Value = {Min=0, Max=1, Default=0.2},
     Step = 0.1,
     Callback = function(value)
         WindUI.TransparencyValue = tonumber(value)
@@ -1379,244 +865,90 @@ local transparencySlider = tampTab:Slider({
     end
 })
 
-local ThemeToggle = tampTab:Toggle({
-    Title = "Dark Mode",
-    Desc = "Use dark color scheme",
-    Value = true,
-    Callback = function(state)
-        if canchangetheme then
-            WindUI:SetTheme(state and "Dark" or "Light")
-        end
-        if canchangedropdown then
-            themeDropdown:Select(state and "Dark" or "Light")
-        end
-    end
-})
-
-WindUI:OnThemeChange(function(theme)
-    canchangetheme = false
-    ThemeToggle:Set(theme == "Dark")
-    canchangetheme = true
-end)
-
--- ============================================================
 -- INFO TAB
--- ============================================================
 InfoTab:Button({
     Title = "Copy Discord",
     Icon = "geist:logo-discord",
-    Desc = "Copy Discord link",
     Callback = function()
         if setclipboard then
             setclipboard("https://discord.gg/cjZPqHRV")
-            notify("Success", "Discord link copied", 2)
-        else
-            notify("Error", "Clipboard not available", 2)
+            notify("Success", "Discord copied", 2)
         end
     end
 })
 
-InfoTab:Section({
-    Title = "UPDATE CHECKER",
-    TextSize = 20,
-})
-
-InfoTab:Button({
-    Title = "Check Update",
-    Icon = "lucide:download",
-    Desc = "Check for latest version",
-    Callback = function()
-        notify("Update", "Checking...", 2)
-        
-        task.spawn(function()
-            local success, result = pcall(function()
-                return game:HttpGet("https://raw.githubusercontent.com/v0ydxfc6666/v0ydffx/refs/heads/main/ffx/")
-            end)
-            
-            if success then
-                local latestVersion = result:match("%S+")
-                local currentVersion = "Gen3-GroundLock"
-                
-                if latestVersion and latestVersion ~= currentVersion then
-                    notify("Update", "New version: " .. latestVersion, 3)
-                    task.wait(2)
-                    
-                    pcall(function()
-                        loadstring(game:HttpGet("https://raw.githubusercontent.com/v0ydxfc6666/v0ydffx/refs/heads/main/ffx/"))()
-                    end)
-                else
-                    notify("Update", "Already up to date", 2)
-                end
-            else
-                notify("Error", "Cannot check update", 2)
-            end
-        end)
-    end
-})
-
-InfoTab:Section({
-    Title = "CHANGELOG",
-    TextSize = 18,
-})
-
+InfoTab:Section({Title = "CHANGELOG", TextSize = 14})
 InfoTab:Section({
     Title = [[
-Gen3 - SPEED FIXED + GROUND LOCK!
+Gen2 - JUMP FIXED! ✅
 
-🔧 MAJOR FIXES:
-✅ SPEED SYSTEM FIXED!
-   • 1.0x - 10.0x now works correctly
-   • duration = BASE_FRAME_TIME / playbackRate
-   • Higher speed = faster movement
-   • Lower speed = slower movement
+🔧 JUMP FIX:
+• StateChanged detection
+• Jump debounce (0.5s)
+• Freefall protection
+• Landing detection
+• Anti-beton smart disable
 
-🦶 GROUND LOCK SYSTEM (NEW!):
-✅ Feet Touch Ground!
-   • Raycast ground detection
-   • Smooth Y-axis adjustment
-   • Preserves ALL animations
-   • No floating characters!
-   • Ground smoothness slider
+✅ FIXES:
+• Jump = Jump animation ✅
+• Fall = Fall animation ✅
+• Anti-beton won't interfere
+• Smooth transitions kept
 
-🎯 ANIMATION PRESERVATION:
-✅ All animations work perfectly:
-   • Jump animation - WORKS ✅
-   • Run animation - WORKS ✅
-   • Fall animation - WORKS ✅
-   • Walk animation - WORKS ✅
-   • Idle animation - WORKS ✅
-
-⚙️ HOW IT WORKS:
-1. Ground Lock:
-   - Detects ground below (10 studs)
-   - Adjusts Y position smoothly
-   - Maintains rotation/animations
-   - Uses humanoid HipHeight
-
-2. Speed System:
-   - playbackRate now applied correctly
-   - 1.0x = normal speed
-   - 2.0x = 2x faster
-   - 5.0x = 5x faster
-   - Works in real-time!
-
-3. Animation System:
-   - humanoid:Move() preserved
-   - ChangeState() for jump/fall
-   - All recorder animations intact
-   - Natural movement feel
-
-🛡️ PRESERVED FROM GEN2:
-• 120FPS system
-• Anti-jitter system
-• Septic easing
-• Smoothness control
+🛡️ ANTI-JITTER:
+• Position smoothing
 • Network ownership
-• Velocity stabilization
+• Heartbeat sync
+• Triple smoothing layer
 
-🎮 NEW CONTROLS:
-• Ground Lock toggle
-• Ground Smoothness slider
-• Speed dropdown (working!)
-• All Gen2 features
+🚀 120FPS:
+• Ultra smooth movement
+• Septic easing (7th)
+• Speed: 1.0x - 10.0x
+• Follow recording 100%
 
-📊 COMPARISON:
-Gen2:
-• Speed: NOT working ❌
-• Ground: Floating ❌
-• Jump: Works ✅
+🎯 FEATURES:
+• Smooth transitions
+• Custom animations
+• Speed control
+• Loop mode
+• Smart anti-beton
 
-Gen3:
-• Speed: WORKING! ✅✅✅
-• Ground: Touches! ✅✅✅
-• Jump: Works ✅✅✅
+💡 JUMP LOGIC:
+✅ Jumping state tracked
+✅ 0.5s debounce period
+✅ Anti-beton auto-pause
+✅ Landing detection
+✅ Natural animations
 
-💡 RECOMMENDED SETTINGS:
-• Speed: 1.5x - 3.0x
-• Ground Lock: ON ✅
-• Ground Smoothness: 0.4
-• Smoothness: 0.05
-• 120FPS Mode: ON
-
-🎉 RESULT:
-• Speed actually works now!
-• Feet touch ground perfectly!
-• All animations natural!
-• Jump/run/fall preserved!
-• Ultra smooth movement!
-
-Own: Jinho | Gen3 Speed+Ground
+Own: Jinho | Gen2 Jump Fixed
     ]],
     TextSize = 14,
     TextTransparency = 0.25,
 })
 
--- ============================================================
--- WINDOW CONFIGURATION
--- ============================================================
-Window:DisableTopbarButtons({
-    "Close",
-})
-
+-- WINDOW CONFIG
+Window:DisableTopbarButtons({"Close"})
 Window:EditOpenButton({
     Title = "AstrionHUB",
     Icon = "geist:logo-nuxt",
     CornerRadius = UDim.new(0,16),
-    StrokeThickness = 2,
     Color = ColorSequence.new(
         Color3.fromHex("FF0F7B"), 
         Color3.fromHex("F89B29")
     ),
-    OnlyMobile = false,
     Enabled = true,
     Draggable = true,
 })
 
 Window:Tag({
-    Title = "Gen3 Fixed!",
+    Title = "Jump Fixed",
     Color = Color3.fromHex("#30ff6a"),
     Radius = 10,
 })
 
-local TimeTag = Window:Tag({
-    Title = "--:--:--",
-    Icon = "lucide:timer",
-    Radius = 10,
-    Color = WindUI:Gradient({
-        ["0"]   = { Color = Color3.fromHex("#FF0F7B"), Transparency = 0 },
-        ["100"] = { Color = Color3.fromHex("#F89B29"), Transparency = 0 },
-    }, {
-        Rotation = 45,
-    }),
-})
-
-local hue = 0
-
-task.spawn(function()
-    while true do
-        local now = os.date("*t")
-        local hours   = string.format("%02d", now.hour)
-        local minutes = string.format("%02d", now.min)
-        local seconds = string.format("%02d", now.sec)
-
-        hue = (hue + 0.01) % 1
-        local color = Color3.fromHSV(hue, 1, 1)
-
-        TimeTag:SetTitle(hours .. ":" .. minutes .. ":" .. seconds)
-        TimeTag:SetColor(color)
-
-        task.wait(0.06)
-    end
-end)
-
-Window:CreateTopbarButton("theme-switcher", "moon", function()
-    WindUI:SetTheme(WindUI:GetCurrentTheme() == "Dark" and "Light" or "Dark")
-end, 990)
-
--- ============================================================
 -- INITIALIZATION
--- ============================================================
-notify("AstrionHUB Gen3", "✅ Speed Fixed + Ground Lock Loaded!", 3)
+notify("AstrionHUB Gen2", "✅ Jump Fixed - 120FPS!", 3)
 
 pcall(function()
     Window:Show()
