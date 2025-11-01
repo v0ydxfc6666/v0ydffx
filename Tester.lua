@@ -35,15 +35,15 @@ local Window = WindUI:CreateWindow({
     }
 })
 
-Window:Tag({Title = "v1.1", Icon = "github", Color = Color3.fromRGB(200, 0, 0)})
+Window:Tag({Title = "v1.1", Icon = "code", Color = Color3.fromRGB(200, 0, 0)})
 
-local BypassTab = Window:Tab({Title = "Bypass", Icon = "shield"})
-local ManualTab = Window:Tab({Title = "Auto Walk (Manual)", Icon = "hand"})
-local AutomaticTab = Window:Tab({Title = "Auto Walk (Automatic)", Icon = "bot"})
-local PlayerTab = Window:Tab({Title = "Player Menu", Icon = "user-cog"})
-local AnimationTab = Window:Tab({Title = "Run Animation", Icon = "person-standing"})
-local ServerTab = Window:Tab({Title = "Finding Server", Icon = "globe"})
-local UpdateTab = Window:Tab({Title = "Update Checkpoint", Icon = "file"})
+local BypassTab = Window:Tab({Title = "Bypass", Icon = "shield-check"})
+local ManualTab = Window:Tab({Title = "Auto Walk (Manual)", Icon = "footprints"})
+local AutomaticTab = Window:Tab({Title = "Auto Walk (Automatic)", Icon = "zap"})
+local PlayerTab = Window:Tab({Title = "Player Menu", Icon = "user"})
+local AnimationTab = Window:Tab({Title = "Run Animation", Icon = "activity"})
+local ServerTab = Window:Tab({Title = "Finding Server", Icon = "server"})
+local UpdateTab = Window:Tab({Title = "Update Checkpoint", Icon = "refresh-cw"})
 
 --| BYPASS SECTION |--
 getgenv().AntiIdleActive = false
@@ -82,17 +82,17 @@ BypassTab:Section({Title = "Bypass List"})
 BypassTab:Toggle({
     Title = "Bypass AFK",
     Desc = "Prevents automatic kick from AFK",
-    Icon = "shield",
+    Icon = "shield-check",
     Default = false,
     Callback = function(Value)
         getgenv().AntiIdleActive = Value
         if Value then
             StartAntiIdle()
-            WindUI:Notify({Icon = "shield", Title = "Bypass AFK", Content = "Bypass AFK activated.", Duration = 3})
+            WindUI:Notify({Icon = "check-circle", Title = "Bypass AFK", Content = "Bypass AFK activated.", Duration = 3})
         else
             if AntiIdleConnection then AntiIdleConnection:Disconnect() AntiIdleConnection = nil end
             if MovementLoop then MovementLoop:Disconnect() MovementLoop = nil end
-            WindUI:Notify({Icon = "shield", Title = "Bypass AFK", Content = "Bypass AFK deactivated.", Duration = 3})
+            WindUI:Notify({Icon = "x-circle", Title = "Bypass AFK", Content = "Bypass AFK deactivated.", Duration = 3})
         end
     end,
 })
@@ -121,7 +121,7 @@ local currentFlipRotation = CFrame.new()
 local FLIP_SMOOTHNESS = 0.08
 local manualLoopStartCheckpoint = 1
 local manualIsLoopingActive = false
-local transitionDelay = 0.3
+local transitionDelay = 3.0
 local isTransitioning = false
 
 -- Footstep Variables
@@ -828,7 +828,7 @@ ManualTab:Section({Title = "Manual Auto Walk Settings"})
 ManualTab:Toggle({
     Title = "Pause/Flip Menu",
     Desc = "Show pause and flip controls",
-    Icon = "sliders-horizontal",
+    Icon = "settings",
     Default = false,
     Callback = function(Value)
         if Value then
@@ -850,9 +850,9 @@ ManualTab:Toggle({
     end
 })
 ManualTab:Space()
-ManualTab:Slider({Title = "Loop Delay", Desc = "Delay between checkpoints when looping", Step = 0.5, Value = {Min = 0, Max = 5, Default = 0.3}, Callback = function(value) 
+ManualTab:Slider({Title = "Loop Delay", Desc = "Delay between checkpoints when looping", Step = 0.5, Value = {Min = 1, Max = 5, Default = 3.0}, Callback = function(value) 
     transitionDelay = value 
-    WindUI:Notify({Title = "Loop Delay", Content = string.format("Set to %.1f seconds", value), Duration = 2, Icon = "timer"})
+    WindUI:Notify({Title = "Loop Delay", Content = string.format("Set to %.1f seconds", value), Duration = 2, Icon = "clock"})
 end})
 ManualTab:Space()
 ManualTab:Slider({Title = "Speed Control", Desc = "Adjust auto walk speed", Step = 0.1, Value = {Min = 0.5, Max = 1.5, Default = 1.0}, Callback = function(value) playbackSpeed = value end})
@@ -860,7 +860,7 @@ ManualTab:Space()
 ManualTab:Section({Title = "Manual Controls"})
 
 local manualToggles = {}
-manualToggles["ManualSpawnpoint"] = ManualTab:Toggle({Flag = "ManualSpawnpoint", Title = "Spawnpoint", Desc = "Start from spawn point", Icon = "map-pin", Default = false, Callback = function(Value)
+manualToggles["ManualSpawnpoint"] = ManualTab:Toggle({Flag = "ManualSpawnpoint", Title = "Spawnpoint", Desc = "Start from spawn point", Icon = "home", Default = false, Callback = function(Value)
     if Value then
         for flag, toggle in pairs(manualToggles) do
             if flag ~= "ManualSpawnpoint" then toggle:Set(false) end
@@ -873,7 +873,7 @@ end})
 
 for i = 1, #manualJsonFiles - 1 do
     local flag = "ManualCP" .. i
-    manualToggles[flag] = ManualTab:Toggle({Flag = flag, Title = "Checkpoint " .. i, Desc = "Start from checkpoint " .. i, Icon = "map-pin", Default = false, Callback = function(Value)
+    manualToggles[flag] = ManualTab:Toggle({Flag = flag, Title = "Checkpoint " .. i, Desc = "Start from checkpoint " .. i, Icon = "flag", Default = false, Callback = function(Value)
         if Value then
             for f, toggle in pairs(manualToggles) do
                 if f ~= flag then toggle:Set(false) end
@@ -902,7 +902,7 @@ local autoLastPlaybackTime = 0
 local autoCurrentIndex = 1
 local autoData = nil
 local godModeConnection = nil
-local autoTransitionDelay = 0.3
+local autoTransitionDelay = 3.0
 
 local function findClosestFrameIndex(data, currentPos)
     local closestIndex = 1
@@ -1075,9 +1075,9 @@ end
 AutomaticTab:Section({Title = "Automatic Auto Walk Settings"})
 AutomaticTab:Slider({Title = "Speed", Desc = "Adjust automatic walk speed", Step = 0.1, Value = {Min = 0.5, Max = 2.0, Default = 1.0}, Callback = function(value) autoPlaybackSpeed = value end})
 AutomaticTab:Space()
-AutomaticTab:Slider({Title = "Loop Delay", Desc = "Delay when restarting loop", Step = 0.5, Value = {Min = 0, Max = 5, Default = 0.3}, Callback = function(value) 
+AutomaticTab:Slider({Title = "Loop Delay", Desc = "Delay when restarting loop", Step = 0.5, Value = {Min = 1, Max = 5, Default = 3.0}, Callback = function(value) 
     autoTransitionDelay = value 
-    WindUI:Notify({Title = "Loop Delay", Content = string.format("Set to %.1f seconds", value), Duration = 2, Icon = "timer"})
+    WindUI:Notify({Title = "Loop Delay", Content = string.format("Set to %.1f seconds", value), Duration = 2, Icon = "clock"})
 end})
 AutomaticTab:Space()
 AutomaticTab:Button({Title = "Start Auto Walk", Desc = "Continue from current position", Icon = "play", Color = Color3.fromRGB(0, 200, 0), Callback = function() StartAutomaticWalk() end})
@@ -1086,7 +1086,7 @@ AutomaticTab:Button({Title = "Stop Auto Walk", Desc = "Stop automatic walking", 
     if autoIsRunning then
         StopAutomaticWalk()
         StopGodMode()
-        WindUI:Notify({Title = "Automatic Auto Walk", Content = "Stopped!", Duration = 3, Icon = "stop-circle"})
+        WindUI:Notify({Title = "Automatic Auto Walk", Content = "Stopped!", Duration = 3, Icon = "x-circle"})
     end
 end})
 AutomaticTab:Space()
@@ -1094,14 +1094,14 @@ AutomaticTab:Toggle({Title = "Auto Loop", Desc = "Automatically restart from beg
     autoLoopEnabled = Value
     WindUI:Notify({Title = "Auto Loop", Content = Value and "Enabled - Smooth transitions active" or "Disabled", Duration = 2, Icon = "repeat"})
 end})
-AutomaticTab:Toggle({Title = "God Mode", Desc = "Invincibility mode during auto walk", Icon = "shield-check", Default = false, Callback = function(Value)
+AutomaticTab:Toggle({Title = "God Mode", Desc = "Invincibility mode during auto walk", Icon = "shield", Default = false, Callback = function(Value)
     godModeEnabled = Value
     if Value then
         if autoIsRunning then StartGodMode() end
         WindUI:Notify({Title = "God Mode", Content = "Activated", Duration = 2, Icon = "shield"})
     else
         StopGodMode()
-        WindUI:Notify({Title = "God Mode", Content = "Deactivated", Duration = 2, Icon = "shield"})
+        WindUI:Notify({Title = "God Mode", Content = "Deactivated", Duration = 2, Icon = "shield-off"})
     end
 end})
 AutomaticTab:Space()
@@ -1115,10 +1115,10 @@ AutomaticTab:Button({Title = "Load Route Data", Desc = "Pre-load the automatic r
         local minutes = math.floor(totalTime / 60)
         local seconds = math.floor(totalTime % 60)
         RouteInfo:Set({Title = "Route Loaded", Desc = string.format("Total Frames: %d\nEstimated Time: %dm %ds\nReady to start!", #autoData, minutes, seconds)})
-        WindUI:Notify({Title = "Route Data", Content = "Successfully loaded!", Duration = 3, Icon = "check-check"})
+        WindUI:Notify({Title = "Route Data", Content = "Successfully loaded!", Duration = 3, Icon = "check-circle"})
     else
         RouteInfo:Set({Title = "Load Failed", Desc = "Failed to load route data. Check your connection."})
-        WindUI:Notify({Title = "Error", Content = "Failed to load route data!", Duration = 3, Icon = "x"})
+        WindUI:Notify({Title = "Error", Content = "Failed to load route data!", Duration = 3, Icon = "alert-circle"})
     end
 end})
 
@@ -1187,10 +1187,10 @@ local function SetupCharacter(Char)
 end
 LocalPlayer.CharacterAdded:Connect(function(Char) task.wait(1) SetupCharacter(Char) end)
 if LocalPlayer.Character then SetupCharacter(LocalPlayer.Character) end
-PlayerTab:Toggle({Title = "Walk Speed", Desc = "Enable custom walk speed", Icon = "gauge", Default = false, Callback = function(Value)
+PlayerTab:Toggle({Title = "Walk Speed", Desc = "Enable custom walk speed", Icon = "zap", Default = false, Callback = function(Value)
     WalkSpeedEnabled = Value
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then ApplyWalkSpeed(LocalPlayer.Character.Humanoid) end
-    WindUI:Notify({Title = "Walk Speed", Content = Value and "Enabled" or "Disabled", Duration = 2, Icon = "gauge"})
+    WindUI:Notify({Title = "Walk Speed", Content = Value and "Enabled" or "Disabled", Duration = 2, Icon = "zap"})
 end})
 PlayerTab:Slider({Title = "Set Walk Speed", Desc = "Adjust walk speed value", Step = 1, Value = {Min = 16, Max = 100, Default = 16}, Callback = function(value)
     WalkSpeedValue = value
@@ -1204,7 +1204,7 @@ PlayerTab:Section({Title = "Time Menu"})
 local Lighting = game:GetService("Lighting")
 local TimeLockEnabled = false
 local CurrentTimeValue = 12
-PlayerTab:Toggle({Title = "Lock Time", Desc = "Lock time of day", Icon = "clock", Default = false, Callback = function(Value)
+PlayerTab:Toggle({Title = "Lock Time", Desc = "Lock time of day", Icon = "lock", Default = false, Callback = function(Value)
     TimeLockEnabled = Value
     WindUI:Notify({Title = "Lock Time", Content = Value and "Time locked" or "Time unlocked", Duration = 2, Icon = "clock"})
 end})
@@ -1273,10 +1273,10 @@ end
 local animationToggles = {}
 for i, pack in ipairs(RunAnimations) do
     local flag = "Animation" .. i
-    animationToggles[flag] = AnimationTab:Toggle({Flag = flag, Title = pack.name, Desc = "Apply " .. pack.name, Icon = "person-standing", Default = false, Callback = function(Value)
+    animationToggles[flag] = AnimationTab:Toggle({Flag = flag, Title = pack.name, Desc = "Apply " .. pack.name, Icon = "activity", Default = false, Callback = function(Value)
         local Char = LocalPlayer.Character
         if not Char or not Char:FindFirstChild("Animate") or not Char:FindFirstChild("Humanoid") then
-            WindUI:Notify({Title = "Error", Content = "Character not ready!", Duration = 2, Icon = "x"})
+            WindUI:Notify({Title = "Error", Content = "Character not ready!", Duration = 2, Icon = "alert-circle"})
             return
         end
         local Animate = Char.Animate
@@ -1288,12 +1288,12 @@ for i, pack in ipairs(RunAnimations) do
             SaveOriginalAnims(Animate)
             ApplyAnimation(Animate, Humanoid, pack)
             currentAnimIndex = i
-            WindUI:Notify({Icon = "person-standing", Title = pack.name, Content = "Animation applied!", Duration = 2})
+            WindUI:Notify({Icon = "check-circle", Title = pack.name, Content = "Animation applied!", Duration = 2})
         else
             if currentAnimIndex == i then
                 RestoreOriginal()
                 currentAnimIndex = nil
-                WindUI:Notify({Icon = "person-standing", Title = pack.name, Content = "Animation removed!", Duration = 2})
+                WindUI:Notify({Icon = "x-circle", Title = pack.name, Content = "Animation removed!", Duration = 2})
             end
         end
     end})
@@ -1310,7 +1310,7 @@ local function FetchServers()
         local URL = string.format("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Asc&limit=100%s", PlaceId, Cursor ~= "" and "&cursor="..Cursor or "")
         local success, Response = pcall(function() return game:HttpGet(URL) end)
         if not success then
-            WindUI:Notify({Title = "Error", Content = "Failed to fetch servers!", Duration = 3, Icon = "x"})
+            WindUI:Notify({Title = "Error", Content = "Failed to fetch servers!", Duration = 3, Icon = "alert-circle"})
             return {}
         end
         local Data = HttpService:JSONDecode(Response)
@@ -1326,7 +1326,7 @@ local function CreateServerButtons()
     WindUI:Notify({Title = "Finding Servers", Content = "Searching for servers...", Duration = 3, Icon = "search"})
     local allServers = FetchServers()
     if #allServers == 0 then
-        WindUI:Notify({Title = "Error", Content = "No servers found!", Duration = 3, Icon = "x"})
+        WindUI:Notify({Title = "Error", Content = "No servers found!", Duration = 3, Icon = "alert-circle"})
         return
     end
     ServerTab:Space()
@@ -1334,15 +1334,14 @@ local function CreateServerButtons()
     for _, server in pairs(allServers) do
         local playerCount = string.format("%d/%d", server.playing, server.maxPlayers)
         local isSafe = server.playing <= (server.maxPlayers / 2)
-        local emoji = isSafe and "🟢" or "🟥"
         local safety = isSafe and "Safe" or "No Safe"
-        local name = string.format("%s Server [%s] - %s", emoji, playerCount, safety)
+        local name = string.format("Server [%s] - %s", playerCount, safety)
         ServerTab:Button({Title = name, Icon = "server", Color = isSafe and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0), Callback = function()
             WindUI:Notify({Title = "Teleporting", Content = "Joining server...", Duration = 2, Icon = "loader"})
             TeleportService:TeleportToPlaceInstance(PlaceId, server.id)
         end})
     end
-    WindUI:Notify({Title = "Complete", Content = string.format("Found %d servers!", #allServers), Duration = 3, Icon = "check-check"})
+    WindUI:Notify({Title = "Complete", Content = string.format("Found %d servers!", #allServers), Duration = 3, Icon = "check-circle"})
 end
 ServerTab:Button({Title = "START FIND SERVER", Desc = "Search for servers with low player count", Icon = "search", Color = Color3.fromRGB(50, 150, 250), Callback = function() CreateServerButtons() end})
 
@@ -1352,7 +1351,7 @@ local UpdateStatus = UpdateTab:Paragraph({Title = "Status", Desc = "Ready to upd
 local updateInProgress = false
 UpdateTab:Button({Title = "Update Manual JSON", Desc = "Update all manual checkpoint files", Icon = "download", Color = Color3.fromRGB(50, 150, 250), Callback = function()
     if updateInProgress then
-        WindUI:Notify({Title = "Update", Content = "Update already in progress!", Duration = 2, Icon = "alert-triangle"})
+        WindUI:Notify({Title = "Update", Content = "Update already in progress!", Duration = 2, Icon = "alert-circle"})
         return
     end
     updateInProgress = true
@@ -1366,19 +1365,19 @@ UpdateTab:Button({Title = "Update Manual JSON", Desc = "Update all manual checkp
                 writefile(savePath, res)
                 UpdateStatus:Set({Title = "Updating...", Desc = string.format("Progress: %d/%d - %s", i, #manualJsonFiles, f)})
             else
-                WindUI:Notify({Title = "Error", Content = "Failed to update: " .. f, Duration = 3, Icon = "x"})
+                WindUI:Notify({Title = "Error", Content = "Failed to update: " .. f, Duration = 3, Icon = "alert-circle"})
             end
             task.wait(0.3)
         end
         UpdateStatus:Set({Title = "Complete!", Desc = "All manual checkpoints updated successfully!"})
-        WindUI:Notify({Title = "Update Complete", Content = "Manual checkpoints updated!", Duration = 3, Icon = "check-check"})
+        WindUI:Notify({Title = "Update Complete", Content = "Manual checkpoints updated!", Duration = 3, Icon = "check-circle"})
         updateInProgress = false
     end)
 end})
 UpdateTab:Space()
 UpdateTab:Button({Title = "Update Automatic JSON", Desc = "Update automatic checkpoint file", Icon = "download", Color = Color3.fromRGB(50, 150, 250), Callback = function()
     if updateInProgress then
-        WindUI:Notify({Title = "Update", Content = "Update already in progress!", Duration = 2, Icon = "alert-triangle"})
+        WindUI:Notify({Title = "Update", Content = "Update already in progress!", Duration = 2, Icon = "alert-circle"})
         return
     end
     updateInProgress = true
@@ -1391,10 +1390,10 @@ UpdateTab:Button({Title = "Update Automatic JSON", Desc = "Update automatic chec
             writefile(savePath, res)
             autoData = nil
             UpdateStatus:Set({Title = "Complete!", Desc = "Automatic checkpoint updated successfully!"})
-            WindUI:Notify({Title = "Update Complete", Content = "Automatic checkpoint updated!", Duration = 3, Icon = "check-check"})
+            WindUI:Notify({Title = "Update Complete", Content = "Automatic checkpoint updated!", Duration = 3, Icon = "check-circle"})
         else
             UpdateStatus:Set({Title = "Failed!", Desc = "Failed to update automatic checkpoint."})
-            WindUI:Notify({Title = "Error", Content = "Failed to update automatic checkpoint!", Duration = 3, Icon = "x"})
+            WindUI:Notify({Title = "Error", Content = "Failed to update automatic checkpoint!", Duration = 3, Icon = "alert-circle"})
         end
         updateInProgress = false
     end)
@@ -1405,10 +1404,10 @@ task.spawn(function()
     task.wait(1)
     for i, f in ipairs(manualJsonFiles) do
         local ok = EnsureJsonFile(f)
-        UpdateStatus:Set({Title = "Checking Files", Desc = string.format("Verifying: %d/%d - %s", i, #manualJsonFiles, ok and "✓" or "✗")})
+        UpdateStatus:Set({Title = "Checking Files", Desc = string.format("Verifying: %d/%d - %s", i, #manualJsonFiles, ok and "OK" or "FAIL")})
         task.wait(0.3)
     end
     UpdateStatus:Set({Title = "Ready", Desc = "All checkpoint files verified!"})
 end)
 
-WindUI:Notify({Title = "RullzsyHUB Loaded", Content = "All systems ready! v1.1 - Smooth transitions enabled", Duration = 5, Icon = "check-check"})
+WindUI:Notify({Title = "RullzsyHUB Loaded", Content = "All systems ready! v1.1 - Smooth transitions enabled", Duration = 5, Icon = "check-circle"})
