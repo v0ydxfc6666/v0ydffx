@@ -201,6 +201,8 @@ local accumulatedTime = 0
 local isFlipped = false
 local currentFlipRotation = CFrame.new()
 local FLIP_SMOOTHNESS = 0.05
+local manualLoopStartCheckpoint = 1
+local manualIsLoopingActive = false
 
 -- Helper Functions
 local function vecToTable(v3)
@@ -280,6 +282,7 @@ local function stopPlayback()
     heightOffset = 0
     isFlipped = false
     currentFlipRotation = CFrame.new()
+    manualIsLoopingActive = false
     
     if playbackConnection then
         playbackConnection:Disconnect()
@@ -390,8 +393,150 @@ local function startPlayback(data, onComplete)
     end)
 end
 
-local function playSingleCheckpoint(fileName, checkpointName)
+local function getNextCheckpointIndex(currentIndex)
+    if currentIndex >= 6 then
+        return 1
+    else
+        return currentIndex + 1
+    end
+end
+
+local function walkToStartIfNeeded(character, startPos)
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    local humanoidLocal = character:FindFirstChildOfClass("Humanoid")
+    
+    if not hrp or not humanoidLocal then
+        return false
+    end
+    
+    local distance = (hrp.Position - startPos).Magnitude
+    
+    if distance > 10 then
+        local reached = false
+        local moveConnection
+        
+        moveConnection = humanoidLocal.MoveToFinished:Connect(function(r)
+            reached = true
+            if moveConnection then
+                moveConnection:Disconnect()
+                moveConnection = nil
+            end
+        end)
+        
+        humanoidLocal:MoveTo(startPos)
+        
+        local startTime = tick()
+        local maxWaitTime = 15
+        
+        while not reached and (tick() - startTime) < maxWaitTime do
+            task.wait(0.1)
+        end
+        
+        if moveConnection then
+            moveConnection:Disconnect()
+            moveConnection = nil
+        end
+        
+        return reached
+    end
+    
+    return true
+end
+
+local function playManualCheckpointSequence(startIndex)
+    if not isLoopingEnabled then
+        return
+    end
+    
+    manualIsLoopingActive = true
+    local currentIndex = startIndex
+    
+    local function playNext()
+        if not isLoopingEnabled or not manualIsLoopingActive then
+            return
+        end
+        
+        local fileName = manualJsonFiles[currentIndex]
+        
+        local ok, path = EnsureJsonFile(fileName)
+        if not ok then
+            WindUI:Notify({
+                Title = "Error (Loop)",
+                Content = "Failed to load checkpoint: " .. fileName,
+                Duration = 4,
+                Icon = "x"
+            })
+            stopPlayback()
+            manualIsLoopingActive = false
+            return
+        end
+        
+        local data = loadCheckpoint(fileName)
+        if not data or #data == 0 then
+            WindUI:Notify({
+                Title = "Error (Loop)",
+                Content = "Empty checkpoint data: " .. fileName,
+                Duration = 4,
+                Icon = "x"
+            })
+            stopPlayback()
+            manualIsLoopingActive = false
+            return
+        end
+        
+        local char = LocalPlayer.Character
+        if not char then
+            WindUI:Notify({
+                Title = "Error (Loop)",
+                Content = "Character not found!",
+                Duration = 4,
+                Icon = "x"
+            })
+            stopPlayback()
+            manualIsLoopingActive = false
+            return
+        end
+        
+        local startPos = tableToVec(data[1].position)
+        
+        -- Walk to start position if needed
+        local reached = walkToStartIfNeeded(char, startPos)
+        
+        if not reached then
+            WindUI:Notify({
+                Title = "Auto Walk (Loop)",
+                Content = "Failed to reach start position (timeout)!",
+                Duration = 3,
+                Icon = "x"
+            })
+            stopPlayback()
+            manualIsLoopingActive = false
+            return
+        end
+        
+        -- Small delay for smooth transition
+        task.wait(0.5)
+        
+        startPlayback(data, function()
+            if not isLoopingEnabled or not manualIsLoopingActive then
+                return
+            end
+            
+            -- Small delay between checkpoints for smooth transition
+            task.wait(0.3)
+            
+            local nextIndex = getNextCheckpointIndex(currentIndex)
+            currentIndex = nextIndex
+            playNext()
+        end)
+    end
+    
+    playNext()
+end
+
+local function playSingleCheckpoint(fileName, checkpointName, checkpointIndex)
     stopPlayback()
+    manualIsLoopingActive = false
     
     local ok, path = EnsureJsonFile(fileName)
     if not ok then
@@ -442,19 +587,47 @@ local function playSingleCheckpoint(fileName, checkpointName)
     
     WindUI:Notify({
         Title = "Auto Walk",
+        Content = "Walking to start position...",
+        Duration = 2,
+        Icon = "footprints"
+    })
+    
+    -- Walk to start position
+    local reached = walkToStartIfNeeded(char, startPos)
+    
+    if not reached then
+        WindUI:Notify({
+            Title = "Auto Walk",
+            Content = "Failed to reach start position (timeout)!",
+            Duration = 3,
+            Icon = "x"
+        })
+        return
+    end
+    
+    -- Small delay before starting playback
+    task.wait(0.5)
+    
+    WindUI:Notify({
+        Title = "Auto Walk",
         Content = "Starting from " .. checkpointName,
         Duration = 2,
         Icon = "play"
     })
     
-    startPlayback(data, function()
-        WindUI:Notify({
-            Title = "Auto Walk",
-            Content = "Completed!",
-            Duration = 2,
-            Icon = "check-check"
-        })
-    end)
+    if isLoopingEnabled then
+        manualLoopStartCheckpoint = checkpointIndex
+        playManualCheckpointSequence(checkpointIndex)
+    else
+        startPlayback(data, function()
+            WindUI:Notify({
+                Title = "Auto Walk",
+                Content = "Completed!",
+                Duration = 2,
+                Icon = "check-check"
+            })
+        end)
+    end
 end
 
 -- Manual Tab UI
@@ -478,6 +651,24 @@ ManualTab:Slider({
 
 ManualTab:Space()
 
+ManualTab:Toggle({
+    Title = "Enable Looping",
+    Desc = "Automatically loop between checkpoints",
+    Icon = "repeat",
+    Default = false,
+    Callback = function(Value)
+        isLoopingEnabled = Value
+        WindUI:Notify({
+            Title = "Looping",
+            Content = Value and "Loop enabled!" or "Loop disabled!",
+            Duration = 2,
+            Icon = "repeat"
+        })
+    end,
+})
+
+ManualTab:Space()
+
 ManualTab:Section({
     Title = "Manual Controls",
 })
@@ -497,9 +688,10 @@ ManualTab:Toggle({
                     toggle:Set(false)
                 end
             end
-            playSingleCheckpoint("spawnpoint.json", "Spawnpoint")
+            playSingleCheckpoint("spawnpoint.json", "Spawnpoint", 1)
         else
             stopPlayback()
+            manualIsLoopingActive = false
         end
     end,
 })
@@ -519,9 +711,10 @@ for i = 1, 5 do
                         toggle:Set(false)
                     end
                 end
-                playSingleCheckpoint("checkpoint_" .. i .. ".json", "Checkpoint " .. i)
+                playSingleCheckpoint("checkpoint_" .. i .. ".json", "Checkpoint " .. i, i + 1)
             else
                 stopPlayback()
+                manualIsLoopingActive = false
             end
         end,
     })
@@ -682,7 +875,40 @@ local function StartAutomaticWalk()
     
     WindUI:Notify({
         Title = "Automatic Auto Walk",
-        Content = string.format("Starting from frame %d (%.1f studs away)", closestIndex, distance),
+        Content = string.format("Found closest frame %d (%.1f studs away)", closestIndex, distance),
+        Duration = 2,
+        Icon = "search"
+    })
+    
+    -- Walk to start position if needed
+    if distance > 10 then
+        WindUI:Notify({
+            Title = "Auto Walk",
+            Content = "Walking to start position...",
+            Duration = 2,
+            Icon = "footprints"
+        })
+        
+        local startPos = tableToVec(autoData[closestIndex].position)
+        local reached = walkToStartIfNeeded(char, startPos)
+        
+        if not reached then
+            WindUI:Notify({
+                Title = "Automatic Auto Walk",
+                Content = "Failed to reach start position (timeout)!",
+                Duration = 3,
+                Icon = "x"
+            })
+            return
+        end
+        
+        -- Small delay after reaching position
+        task.wait(0.5)
+    end
+    
+    WindUI:Notify({
+        Title = "Automatic Auto Walk",
+        Content = string.format("Starting from frame %d", closestIndex),
         Duration = 3,
         Icon = "play"
     })
@@ -728,8 +954,39 @@ local function StartAutomaticWalk()
                     Duration = 2,
                     Icon = "repeat"
                 })
+                
+                -- Small delay before restarting
+                task.wait(0.5)
+                
                 autoCurrentIndex = 1
                 autoAccumulatedTime = autoData[1].time or 0
+                
+                -- Walk to start if needed when looping
+                local startPos = tableToVec(autoData[1].position)
+                local currentPos = hrp.Position
+                local distance = (currentPos - startPos).Magnitude
+                
+                if distance > 10 then
+                    WindUI:Notify({
+                        Title = "Auto Loop",
+                        Content = "Walking to restart position...",
+                        Duration = 2,
+                        Icon = "footprints"
+                    })
+                    
+                    local reached = walkToStartIfNeeded(char, startPos)
+                    if not reached then
+                        StopAutomaticWalk()
+                        WindUI:Notify({
+                            Title = "Auto Loop",
+                            Content = "Failed to reach restart position!",
+                            Duration = 3,
+                            Icon = "x"
+                        })
+                        return
+                    end
+                    task.wait(0.5)
+                end
             else
                 StopAutomaticWalk()
                 WindUI:Notify({
