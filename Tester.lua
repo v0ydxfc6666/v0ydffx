@@ -179,14 +179,17 @@ if not isfolder(mainFolder) then makefolder(mainFolder) end
 if not isfolder(jsonFolder) then makefolder(jsonFolder) end
 
 -- JSON Files
-local baseURL = "https://raw.githubusercontent.com/0x0x0x0xblaze/RullzsyHUB/refs/heads/main/json/json_mount_yahayuk/"
+local baseURL = "https://raw.githubusercontent.com/v0ydxfc6666/v0ydffx/refs/heads/main/CFRAME/ALLDATAMAPS/MANUAL/MT_CIELO/"
 local manualJsonFiles = {
     "spawnpoint.json",
-    "checkpoint_1.json",
-    "checkpoint_2.json",
-    "checkpoint_3.json",
-    "checkpoint_4.json",
-    "checkpoint_5.json",
+    "Checkpoint_1.json",
+    "Checkpoint_2.json",
+    "Checkpoint_3.json",
+    "Checkpoint_4.json",
+    "Checkpoint_5.json",
+    "Checkpoint_6.json",
+    "Checkpoint_7.json",
+    "Checkpoint_8.json",
 }
 
 -- Variables
