@@ -534,7 +534,7 @@ end
 local autoJsonFolder = mainFolder .. "/json_automatic"
 if not isfolder(autoJsonFolder) then makefolder(autoJsonFolder) end
 
-local automaticJsonURL = "https://raw.githubusercontent.com/0x0x0x0xblaze/RullzsyHUB/refs/heads/main/json/json_mount_yagesya/checkpoint_1.json"
+local automaticJsonURL = "https://raw.githubusercontent.com/v0ydxfc6666/v0ydffx/refs/heads/main/CFRAME/ALLDATAMAPS/YAHAYUK.json"
 local automaticJsonFile = "automatic_full.json"
 
 local autoPlaybackSpeed = 1.0
