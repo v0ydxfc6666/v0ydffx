@@ -173,8 +173,8 @@ BypassTab:Toggle({
 --| =========================================================== |--
 
 -- Folder Path
-local mainFolder = "X_RULLZSYHUB_X"
-local jsonFolder = mainFolder .. "/json_manual"
+local mainFolder = "ASTRIONHUB"
+local jsonFolder = mainFolder .. "/CIELO_manual"
 if not isfolder(mainFolder) then makefolder(mainFolder) end
 if not isfolder(jsonFolder) then makefolder(jsonFolder) end
 
@@ -522,7 +522,7 @@ for i = 1, 5 do
                         toggle:Set(false)
                     end
                 end
-                playSingleCheckpoint("checkpoint_" .. i .. ".json", "Checkpoint " .. i)
+                playSingleCheckpoint("Checkpoint_" .. i .. ".json", "Checkpoint " .. i)
             else
                 stopPlayback()
             end
@@ -534,7 +534,7 @@ end
 --| AUTO WALK - AUTOMATIC SECTION                               |--
 --| =========================================================== |--
 
-local autoJsonFolder = mainFolder .. "/json_automatic"
+local autoJsonFolder = mainFolder .. "/CIELO_automatic"
 if not isfolder(autoJsonFolder) then makefolder(autoJsonFolder) end
 
 local automaticJsonURL = "https://raw.githubusercontent.com/v0ydxfc6666/v0ydffx/refs/heads/main/CFRAME/ALLDATAMAPS/YAHAYUK.json"
