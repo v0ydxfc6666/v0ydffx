@@ -21,12 +21,12 @@ local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
 -- Create Window
 local Window = WindUI:CreateWindow({
-    Title = "RullzsyHUB | Mount Yahayuk",
-    Author = "by RullzsyHUB",
-    Folder = "RullzsyHUB_MountYahayuk",
+    Title = "🏔️ AstrionHUB | AUTO WALK",
+    Author = "by JINHO",
+    Folder = "AstrionHUB_MountYahayuk",
     
     OpenButton = {
-        Title = "Open RullzsyHUB",
+        Title = "🏔️ AstrionHUB",
         CornerRadius = UDim.new(0, 8),
         StrokeThickness = 2,
         Enabled = true,
@@ -41,7 +41,7 @@ local Window = WindUI:CreateWindow({
 
 -- Tags
 Window:Tag({
-    Title = "v1.0",
+    Title = "v2.0",
     Icon = "github",
     Color = Color3.fromRGB(200, 0, 0)
 })
@@ -173,21 +173,51 @@ BypassTab:Toggle({
 --| =========================================================== |--
 
 -- Folder Path
-local mainFolder = "X_RULLZSYHUB_X"
+local mainFolder = "X-AstrionHUB"
 local jsonFolder = mainFolder .. "/json_manual"
 if not isfolder(mainFolder) then makefolder(mainFolder) end
 if not isfolder(jsonFolder) then makefolder(jsonFolder) end
 
 -- JSON Files
-local baseURL = "https://raw.githubusercontent.com/0x0x0x0xblaze/RullzsyHUB/refs/heads/main/json/json_mount_yahayuk/"
-local manualJsonFiles = {
-    "spawnpoint.json",
-    "checkpoint_1.json",
-    "checkpoint_2.json",
-    "checkpoint_3.json",
-    "checkpoint_4.json",
-    "checkpoint_5.json",
-}
+local baseURL = "https://raw.githubusercontent.com/v0ydxfc6666/v0ydffx/refs/heads/main/CFRAME/ALLDATAMAPS/MANUAL/MT_CIELO/"
+
+-- Auto-detect checkpoint files
+local function GetManualCheckpointFiles()
+    local files = {}
+    local checkpointIndex = 1
+    
+    -- First, check for spawnpoint
+    local spawnOk = pcall(function()
+        game:HttpGet(baseURL .. "spawnpoint.json")
+    end)
+    
+    if spawnOk then
+        table.insert(files, "spawnpoint.json")
+    end
+    
+    -- Then check for checkpoint files
+    while true do
+        local fileName = "checkpoint_" .. checkpointIndex .. ".json"
+        local ok = pcall(function()
+            game:HttpGet(baseURL .. fileName)
+        end)
+        
+        if ok then
+            table.insert(files, fileName)
+            checkpointIndex = checkpointIndex + 1
+        else
+            break
+        end
+        
+        -- Safety limit
+        if checkpointIndex > 50 then break end
+    end
+    
+    return files
+end
+
+-- Load checkpoint files
+local manualJsonFiles = GetManualCheckpointFiles()
 
 -- Variables
 local isPlaying = false
@@ -394,7 +424,7 @@ local function startPlayback(data, onComplete)
 end
 
 local function getNextCheckpointIndex(currentIndex)
-    if currentIndex >= 6 then
+    if currentIndex >= #manualJsonFiles then
         return 1
     else
         return currentIndex + 1
@@ -498,8 +528,6 @@ local function playManualCheckpointSequence(startIndex)
         end
         
         local startPos = tableToVec(data[1].position)
-        
-        -- Walk to start position if needed
         local reached = walkToStartIfNeeded(char, startPos)
         
         if not reached then
@@ -514,7 +542,6 @@ local function playManualCheckpointSequence(startIndex)
             return
         end
         
-        -- Small delay for smooth transition
         task.wait(0.5)
         
         startPlayback(data, function()
@@ -522,7 +549,6 @@ local function playManualCheckpointSequence(startIndex)
                 return
             end
             
-            -- Small delay between checkpoints for smooth transition
             task.wait(0.3)
             
             local nextIndex = getNextCheckpointIndex(currentIndex)
@@ -592,7 +618,6 @@ local function playSingleCheckpoint(fileName, checkpointName, checkpointIndex)
         Icon = "footprints"
     })
     
-    -- Walk to start position
     local reached = walkToStartIfNeeded(char, startPos)
     
     if not reached then
@@ -605,7 +630,6 @@ local function playSingleCheckpoint(fileName, checkpointName, checkpointIndex)
         return
     end
     
-    -- Small delay before starting playback
     task.wait(0.5)
     
     WindUI:Notify({
@@ -675,33 +699,21 @@ ManualTab:Section({
 
 local manualToggles = {}
 
-ManualTab:Toggle({
-    Flag = "ManualSpawnpoint",
-    Title = "Spawnpoint",
-    Desc = "Start from spawn point",
-    Icon = "map-pin",
-    Default = false,
-    Callback = function(Value)
-        if Value then
-            for flag, toggle in pairs(manualToggles) do
-                if flag ~= "ManualSpawnpoint" then
-                    toggle:Set(false)
-                end
-            end
-            playSingleCheckpoint("spawnpoint.json", "Spawnpoint", 1)
-        else
-            stopPlayback()
-            manualIsLoopingActive = false
-        end
-    end,
-})
-
-for i = 1, 5 do
+-- Dynamic checkpoint toggles
+for i, fileName in ipairs(manualJsonFiles) do
+    local displayName
+    if fileName:match("spawnpoint") then
+        displayName = "Spawnpoint"
+    else
+        local cpNum = fileName:match("checkpoint_(%d+)")
+        displayName = "Checkpoint " .. (cpNum or i)
+    end
+    
     local flag = "ManualCP" .. i
     manualToggles[flag] = ManualTab:Toggle({
         Flag = flag,
-        Title = "Checkpoint " .. i,
-        Desc = "Start from checkpoint " .. i,
+        Title = displayName,
+        Desc = "Start from " .. displayName:lower(),
         Icon = "map-pin",
         Default = false,
         Callback = function(Value)
@@ -711,7 +723,7 @@ for i = 1, 5 do
                         toggle:Set(false)
                     end
                 end
-                playSingleCheckpoint("checkpoint_" .. i .. ".json", "Checkpoint " .. i, i + 1)
+                playSingleCheckpoint(fileName, displayName, i)
             else
                 stopPlayback()
                 manualIsLoopingActive = false
@@ -880,7 +892,6 @@ local function StartAutomaticWalk()
         Icon = "search"
     })
     
-    -- Walk to start position if needed
     if distance > 10 then
         WindUI:Notify({
             Title = "Auto Walk",
@@ -902,7 +913,6 @@ local function StartAutomaticWalk()
             return
         end
         
-        -- Small delay after reaching position
         task.wait(0.5)
     end
     
@@ -955,13 +965,11 @@ local function StartAutomaticWalk()
                     Icon = "repeat"
                 })
                 
-                -- Small delay before restarting
                 task.wait(0.5)
                 
                 autoCurrentIndex = 1
                 autoAccumulatedTime = autoData[1].time or 0
                 
-                -- Walk to start if needed when looping
                 local startPos = tableToVec(autoData[1].position)
                 local currentPos = hrp.Position
                 local distance = (currentPos - startPos).Magnitude
@@ -1704,9 +1712,16 @@ UpdateTab:Button({
         
         updateInProgress = true
         
+        WindUI:Notify({
+            Title = "Update Started",
+            Content = "Updating manual checkpoints...",
+            Duration = 2,
+            Icon = "download"
+        })
+        
         UpdateStatus:Set({
             Title = "Updating...",
-            Desc = "Updating manual checkpoint files..."
+            Desc = "Preparing to update..."
         })
         
         task.spawn(function()
@@ -1714,13 +1729,21 @@ UpdateTab:Button({
                 local savePath = jsonFolder .. "/" .. f
                 if isfile(savePath) then delfile(savePath) end
                 
+                UpdateStatus:Set({
+                    Title = "Updating...",
+                    Desc = string.format("Progress: %d/%d", i, #manualJsonFiles)
+                })
+                
+                WindUI:Notify({
+                    Title = "Update Progress",
+                    Content = string.format("%d/%d - %s", i, #manualJsonFiles, f),
+                    Duration = 1.5,
+                    Icon = "download"
+                })
+                
                 local ok, res = pcall(function() return game:HttpGet(baseURL..f) end)
                 if ok and res and #res > 0 then
                     writefile(savePath, res)
-                    UpdateStatus:Set({
-                        Title = "Updating...",
-                        Desc = string.format("Progress: %d/%d - %s", i, #manualJsonFiles, f)
-                    })
                 else
                     WindUI:Notify({
                         Title = "Error",
@@ -1729,7 +1752,7 @@ UpdateTab:Button({
                         Icon = "x"
                     })
                 end
-                task.wait(0.3)
+                task.wait(0.5)
             end
             
             UpdateStatus:Set({
@@ -1739,8 +1762,8 @@ UpdateTab:Button({
             
             WindUI:Notify({
                 Title = "Update Complete",
-                Content = "Manual checkpoints updated!",
-                Duration = 3,
+                Content = string.format("All %d manual checkpoints updated!", #manualJsonFiles),
+                Duration = 4,
                 Icon = "check-check"
             })
             
@@ -1769,9 +1792,16 @@ UpdateTab:Button({
         
         updateInProgress = true
         
+        WindUI:Notify({
+            Title = "Update Started",
+            Content = "1/1 - Updating automatic checkpoint...",
+            Duration = 2,
+            Icon = "download"
+        })
+        
         UpdateStatus:Set({
             Title = "Updating...",
-            Desc = "Updating automatic checkpoint file..."
+            Desc = "Progress: 1/1 - Downloading automatic checkpoint..."
         })
         
         task.spawn(function()
@@ -1793,8 +1823,8 @@ UpdateTab:Button({
                 
                 WindUI:Notify({
                     Title = "Update Complete",
-                    Content = "Automatic checkpoint updated!",
-                    Duration = 3,
+                    Content = "1/1 - Automatic checkpoint updated!",
+                    Duration = 4,
                     Icon = "check-check"
                 })
             else
@@ -1805,7 +1835,7 @@ UpdateTab:Button({
                 
                 WindUI:Notify({
                     Title = "Error",
-                    Content = "Failed to update automatic checkpoint!",
+                    Content = "1/1 - Failed to update automatic checkpoint!",
                     Duration = 3,
                     Icon = "x"
                 })
@@ -1834,14 +1864,14 @@ task.spawn(function()
     end
     UpdateStatus:Set({
         Title = "Ready",
-        Desc = "All checkpoint files verified!"
+        Desc = string.format("All %d checkpoint files verified!", #manualJsonFiles)
     })
 end)
 
 -- Final notification
 WindUI:Notify({
-    Title = "RullzsyHUB Loaded",
-    Content = "All systems ready!",
+    Title = "🏔️ AstrionHUB Loaded",
+    Content = string.format("All systems ready! Found %d manual checkpoints", #manualJsonFiles),
     Duration = 5,
     Icon = "check-check"
 })
