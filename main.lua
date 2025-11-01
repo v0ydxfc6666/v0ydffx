@@ -23,7 +23,7 @@ local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local Window = WindUI:CreateWindow({
     Title = "RullzsyHUB | Mount Yahayuk",
     Author = "by RullzsyHUB",
-    Folder = "RullzsyHUB_MountYagesya",
+    Folder = "RullzsyHUB_MountCielo",
     OpenButton = {
         Title = "Open RullzsyHUB",
         CornerRadius = UDim.new(0, 8),
@@ -99,19 +99,13 @@ BypassTab:Toggle({
 
 --| AUTO WALK - MANUAL SECTION |--
 local mainFolder = "ASTRIONHUB"
-local jsonFolder = mainFolder .. "/YGY_manual"
+local jsonFolder = mainFolder .. "/YHY_manual"
 if not isfolder(mainFolder) then makefolder(mainFolder) end
 if not isfolder(jsonFolder) then makefolder(jsonFolder) end
 
-local baseURL = "https://raw.githubusercontent.com/0x0x0x0xblaze/RullzsyHUB/refs/heads/main/json/json_mount_yagesya/"
-local jsonFiles = {
-    "spawnpoint.json",
-    "checkpoint_1.json",
-    "checkpoint_2.json",
-    "checkpoint_3.json",
-    "checkpoint_4.json",
-    "checkpoint_5.json",
-}
+local baseURL = "https://raw.githubusercontent.com/v0ydxfc6666/v0ydffx/refs/heads/main/CFRAME/ALLDATAMAPS/MANUAL/MT_CIELO2/"
+local manualJsonFiles = {"spawnpoint.json", "checkpoint_1.json", "checkpoint_2.json", "checkpoint_3.json", "checkpoint_4.json", "checkpoint_5.json", "checkpoint_6.json", "checkpoint_7.json", "checkpoint_8.json"}
+
 local isPlaying = false
 local playbackConnection = nil
 local playbackSpeed = 1.0
