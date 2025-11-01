@@ -104,7 +104,7 @@ if not isfolder(mainFolder) then makefolder(mainFolder) end
 if not isfolder(jsonFolder) then makefolder(jsonFolder) end
 
 local baseURL = "https://raw.githubusercontent.com/0x0x0x0xblaze/RullzsyHUB/refs/heads/main/json/json_mount_yahayuk/"
-local manualJsonFiles = {"spawnpoint.json", "checkpoint_1.json", "checkpoint_2.json", "checkpoint_3.json", "checkpoint_4.json", "checkpoint_5.json", "checkpoint_6.json"}
+local manualJsonFiles = {"spawnpoint.json", "checkpoint_1.json", "checkpoint_2.json", "checkpoint_3.json", "checkpoint_4.json", "checkpoint_5.json"}
 
 local isPlaying = false
 local playbackConnection = nil
@@ -262,58 +262,38 @@ local function smoothWalkToPosition(character, targetPos, maxDistance)
     local humanoidLocal = character:FindFirstChildOfClass("Humanoid")
     if not hrp or not humanoidLocal then return false end
     local distance = (hrp.Position - targetPos).Magnitude
-    if distance <= 5 then return true end
+    if distance <= 8 then return true end
     if distance > maxDistance then
-        WindUI:Notify({Title = "Distance Warning", Content = string.format("Too far from next checkpoint (%.0f studs)", distance), Duration = 3, Icon = "alert-triangle"})
+        WindUI:Notify({Title = "Distance Warning", Content = string.format("Too far from checkpoint (%.0f studs)", distance), Duration = 3, Icon = "alert-triangle"})
         return false
     end
     isTransitioning = true
-    local pathfindingService = game:GetService("PathfindingService")
-    local path = pathfindingService:CreatePath({AgentRadius = 2, AgentHeight = 5, AgentCanJump = true, AgentJumpHeight = 7.5, AgentMaxSlope = 45})
-    local success, errorMsg = pcall(function() path:ComputeAsync(hrp.Position, targetPos) end)
-    if not success or path.Status ~= Enum.PathStatus.Success then
-        humanoidLocal:MoveTo(targetPos)
-        local startTime = tick()
-        local timeout = 30
-        while (hrp.Position - targetPos).Magnitude > 5 and (tick() - startTime) < timeout do
-            if not isLoopingEnabled or not manualIsLoopingActive then isTransitioning = false return false end
-            task.wait(0.1)
-        end
-        isTransitioning = false
-        return (hrp.Position - targetPos).Magnitude <= 5
-    end
-    local waypoints = path:GetWaypoints()
-    local waypointConnection
-    local function onWaypointReached(reached)
-        if reached and not isTransitioning then
-            if waypointConnection then waypointConnection:Disconnect() waypointConnection = nil end
-            return
-        end
-    end
-    waypointConnection = humanoidLocal.MoveToFinished:Connect(onWaypointReached)
-    for i, waypoint in ipairs(waypoints) do
-        if not isLoopingEnabled or not manualIsLoopingActive then
-            if waypointConnection then waypointConnection:Disconnect() end
+    humanoidLocal:MoveTo(targetPos)
+    local startTime = tick()
+    local timeout = 60
+    local lastDistance = distance
+    local stuckCounter = 0
+    while (hrp.Position - targetPos).Magnitude > 8 and (tick() - startTime) < timeout do
+        if not isLoopingEnabled and not manualIsLoopingActive and not autoIsRunning then
             isTransitioning = false
             return false
         end
-        if waypoint.Action == Enum.PathWaypointAction.Jump then humanoidLocal:ChangeState(Enum.HumanoidStateType.Jumping) end
-        humanoidLocal:MoveTo(waypoint.Position)
-        local moveStartTime = tick()
-        while (hrp.Position - waypoint.Position).Magnitude > 3 do
-            if not isLoopingEnabled or not manualIsLoopingActive then
-                if waypointConnection then waypointConnection:Disconnect() end
-                isTransitioning = false
-                return false
+        local currentDistance = (hrp.Position - targetPos).Magnitude
+        if math.abs(currentDistance - lastDistance) < 0.5 then
+            stuckCounter = stuckCounter + 1
+            if stuckCounter > 10 then
+                humanoidLocal:MoveTo(targetPos)
+                stuckCounter = 0
             end
-            if (tick() - moveStartTime) > 10 then break end
-            task.wait(0.1)
+        else
+            stuckCounter = 0
         end
+        lastDistance = currentDistance
+        task.wait(0.2)
     end
-    if waypointConnection then waypointConnection:Disconnect() end
-    local finalDistance = (hrp.Position - targetPos).Magnitude
     isTransitioning = false
-    return finalDistance <= 8
+    local finalDistance = (hrp.Position - targetPos).Magnitude
+    return finalDistance <= 15
 end
 
 local function playManualCheckpointSequence(startIndex)
@@ -348,15 +328,12 @@ local function playManualCheckpointSequence(startIndex)
         local hrp = char:FindFirstChild("HumanoidRootPart")
         if not hrp then stopPlayback() manualIsLoopingActive = false return end
         local distance = (hrp.Position - startPos).Magnitude
-        if distance > 5 then
+        if distance > 8 then
             local reached = smoothWalkToPosition(char, startPos, 150)
             if not reached then
-                WindUI:Notify({Title = "Auto Walk (Loop)", Content = "Failed to reach checkpoint start!", Duration = 3, Icon = "x"})
-                stopPlayback()
-                manualIsLoopingActive = false
-                return
+                WindUI:Notify({Title = "Auto Walk (Loop)", Content = "Starting anyway from current position!", Duration = 2, Icon = "info"})
             end
-            task.wait(0.2)
+            task.wait(0.3)
         end
         startPlayback(data, function()
             if not isLoopingEnabled or not manualIsLoopingActive then return end
@@ -393,14 +370,13 @@ local function playSingleCheckpoint(fileName, checkpointName, checkpointIndex)
         WindUI:Notify({Title = "Auto Walk", Content = string.format("You're too far (%.0f studs)! Get closer to checkpoint.", distance), Duration = 5, Icon = "alert-triangle"})
         return
     end
-    if distance > 5 then
+    if distance > 8 then
         WindUI:Notify({Title = "Auto Walk", Content = "Walking smoothly to start position...", Duration = 2, Icon = "footprints"})
         local reached = smoothWalkToPosition(char, startPos, 200)
         if not reached then
-            WindUI:Notify({Title = "Auto Walk", Content = "Failed to reach start position!", Duration = 3, Icon = "x"})
-            return
+            WindUI:Notify({Title = "Auto Walk", Content = "Starting from current position!", Duration = 2, Icon = "info"})
         end
-        task.wait(0.2)
+        task.wait(0.3)
     end
     WindUI:Notify({Title = "Auto Walk", Content = "Starting from " .. checkpointName, Duration = 2, Icon = "play"})
     if isLoopingEnabled then
@@ -554,10 +530,9 @@ local function StartAutomaticWalk()
         local startPos = tableToVec(autoData[closestIndex].position)
         local reached = smoothWalkToPosition(char, startPos, 200)
         if not reached then
-            WindUI:Notify({Title = "Automatic Auto Walk", Content = "Failed to reach start position!", Duration = 3, Icon = "x"})
-            return
+            WindUI:Notify({Title = "Automatic Auto Walk", Content = "Starting from current position!", Duration = 2, Icon = "info"})
         end
-        task.wait(0.2)
+        task.wait(0.3)
     end
     WindUI:Notify({Title = "Automatic Auto Walk", Content = string.format("Starting from frame %d", closestIndex), Duration = 3, Icon = "play"})
     autoIsRunning = true
@@ -596,11 +571,9 @@ local function StartAutomaticWalk()
                     WindUI:Notify({Title = "Auto Loop", Content = "Walking to restart position...", Duration = 2, Icon = "footprints"})
                     local reached = smoothWalkToPosition(char, startPos, 200)
                     if not reached then
-                        StopAutomaticWalk()
-                        WindUI:Notify({Title = "Auto Loop", Content = "Failed to reach restart position!", Duration = 3, Icon = "x"})
-                        return
+                        WindUI:Notify({Title = "Auto Loop", Content = "Restarting from current position!", Duration = 2, Icon = "info"})
                     end
-                    task.wait(0.2)
+                    task.wait(0.3)
                 end
                 StartAutomaticWalk()
                 return
